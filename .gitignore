@@ -1,0 +1,37 @@
+# macOS
+.DS_Store
+
+# Xcode user state
+xcuserdata/
+*.xcuserstate
+*.xcuserdatad/
+
+# Build artifacts
+build/
+DerivedData/
+*.xcarchive
+
+# Swift Package Manager
+.swiftpm/
+.build/
+# Package.resolved is committed starting Phase 1 (when DynamicNotchKit is added).
+
+# Playground
+timeline.xctimeline
+playground.xcworkspace
+
+# Instruments
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# CocoaPods / Carthage (not used, but harmless)
+Pods/
+Carthage/Build/
+
+# fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
