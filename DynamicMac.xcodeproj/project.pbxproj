@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		CDDNKPKG0000000000000001 /* DynamicNotchKit in Frameworks */ = {isa = PBXBuildFile; productRef = CDDNKPKG0000000000000003 /* DynamicNotchKit */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		CD4EC84F2F8299830002A7F1 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CDDNKPKG0000000000000001 /* DynamicNotchKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +117,7 @@
 			);
 			name = DynamicMac;
 			packageProductDependencies = (
+				CDDNKPKG0000000000000003 /* DynamicNotchKit */,
 			);
 			productName = DynamicMac;
 			productReference = CD4EC83F2F8299810002A7F1 /* DynamicMac.app */;
@@ -195,6 +201,9 @@
 			);
 			mainGroup = CD4EC8362F8299810002A7F1;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				CDDNKPKG0000000000000002 /* XCRemoteSwiftPackageReference "DynamicNotchKit" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = CD4EC8402F8299810002A7F1 /* Products */;
 			projectDirPath = "";
@@ -577,6 +586,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		CDDNKPKG0000000000000002 /* XCRemoteSwiftPackageReference "DynamicNotchKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/MrKai77/DynamicNotchKit";
+			requirement = {
+				kind = exactVersion;
+				version = 1.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		CDDNKPKG0000000000000003 /* DynamicNotchKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CDDNKPKG0000000000000002 /* XCRemoteSwiftPackageReference "DynamicNotchKit" */;
+			productName = DynamicNotchKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = CD4EC8372F8299810002A7F1 /* Project object */;
 }

@@ -14,7 +14,7 @@ DerivedData/
 # Swift Package Manager
 .swiftpm/
 .build/
-# Package.resolved is committed starting Phase 1 (when DynamicNotchKit is added).
+# Package.resolved is intentionally committed — it's the SPM dependency lock file.
 
 # Playground
 timeline.xctimeline

@@ -4,6 +4,35 @@ Plan compiled 2026-04-05. Consumes two research briefs:
 - Platform brief: `/Users/lidor.nirshalom/.claude/plans/graceful-whistling-wilkes-agent-a4a75c4d9233f2210.md` (notch APIs, NSPanel, hover, fullscreen, multi-display, entitlements, battery, SwiftUI/AppKit hybrid, animation, ~50 cited sources).
 - Media brief: `/Users/lidor.nirshalom/.claude/plans/graceful-whistling-wilkes-agent-aaedcef8f4c50b19c.md` (MediaRemote locked down in macOS 15.4, `ungive/mediaremote-adapter` is the 2026 answer, integration sketch, signing checklist, competitor analysis).
 
+## Status
+
+| Phase | Status | Commit |
+|---|---|---|
+| Phase 0 — Reset template and hygiene | Done | `82675ee` |
+| Phase 1 — MVP overlay + hover + spring expand | Done | (see latest) |
+| Phase 2 — Timers widget | Not started | — |
+| Phase 3 — Now Playing widget | Not started | — |
+| Phase 4 — Settings and polish | Not started | — |
+| Phase 5 — Polish, performance, and ship | Not started | — |
+
+### Phase 1 architectural simplification
+
+Original plan proposed an `IslandState` (`@Observable` state machine with
+`.idle` / `.hoverCollapsed` / `.expanded`) plus a matching `IslandContentView`
+that switched on that state. After researching DynamicNotchKit 1.0.0 we found
+the package internally owns the hover → expand/compact/hidden state machine
+and wires NSTrackingArea for us. Writing our own state machine on top would
+duplicate the library's logic and fight its animation timing.
+
+**Resolution:** skip `IslandState` and `IslandContentView` for MVP. The
+`expanded:` closure we pass to `DynamicNotch.init` receives a SwiftUI view
+that renders **only when the island is expanded** — DynamicNotchKit handles
+show/hide on hover. Our SwiftUI view (`HelloWorldWidgetView` in Phase 1) is
+just the expanded content. We keep `Constants.swift` because the tuning knobs
+are still valuable, and we will reintroduce an `@Observable` state type in a
+later phase only when we need **programmatic** expansion (auto-expand on
+timer completion in Phase 2, priority-based widget routing in Phase 3).
+
 ## 1. Context
 
 **DynamicMac** is a macOS menu-bar agent app that gives MacBooks a Dynamic-Island-style overlay around the notch. When the user moves the cursor to the notch, a rounded-rectangle island morphs open with a native spring animation and shows a small glanceable surface: timers, system-wide Now Playing controls, and lightweight status widgets. On Macs without a notch (external displays, older Macs), a simulated notch-pill renders at the top-center of the active screen. Agent-style (`LSUIElement`), no Dock icon, battery-friendly, distributed via Developer ID + notarization + Sparkle.

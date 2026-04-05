@@ -7,18 +7,21 @@
 
 import AppKit
 
-/// Lifecycle owner for DynamicMac. Hosts the menu bar status item and,
-/// in later phases, the notch overlay controller and injected services.
-/// Phase 0 scope: menu bar presence only — no overlay, no services.
+/// Lifecycle owner for DynamicMac. Hosts the menu bar status item and
+/// the notch island controller. In later phases also owns injected
+/// services (TimerService, MediaService, AppSettings).
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusItem: NSStatusItem?
+    private let islandController = NotchIslandController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         installStatusItem()
+        islandController.start()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        islandController.shutdown()
         if let statusItem {
             NSStatusBar.system.removeStatusItem(statusItem)
         }
