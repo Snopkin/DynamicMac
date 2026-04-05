@@ -19,19 +19,54 @@ Plan compiled 2026-04-05. Consumes two research briefs:
 
 Original plan proposed an `IslandState` (`@Observable` state machine with
 `.idle` / `.hoverCollapsed` / `.expanded`) plus a matching `IslandContentView`
-that switched on that state. After researching DynamicNotchKit 1.0.0 we found
-the package internally owns the hover → expand/compact/hidden state machine
-and wires NSTrackingArea for us. Writing our own state machine on top would
-duplicate the library's logic and fight its animation timing.
+that switched on that state. We skipped both for MVP and keep the
+`expanded:` closure as the single SwiftUI entry point. We will reintroduce
+an `@Observable` state type in a later phase only when we need
+**programmatic** expansion (auto-expand on timer completion in Phase 2,
+priority-based widget routing in Phase 3).
 
-**Resolution:** skip `IslandState` and `IslandContentView` for MVP. The
-`expanded:` closure we pass to `DynamicNotch.init` receives a SwiftUI view
-that renders **only when the island is expanded** — DynamicNotchKit handles
-show/hide on hover. Our SwiftUI view (`HelloWorldWidgetView` in Phase 1) is
-just the expanded content. We keep `Constants.swift` because the tuning knobs
-are still valuable, and we will reintroduce an `@Observable` state type in a
-later phase only when we need **programmatic** expansion (auto-expand on
-timer completion in Phase 2, priority-based widget routing in Phase 3).
+### Phase 1 hover-detection fix (correction to earlier misread of the library)
+
+Initial Phase 1 implementation constructed the `DynamicNotch` and never
+called `expand()`, on the assumption that the library listens for cursor
+movement over the notch and opens itself. Reading `DynamicNotch.swift` and
+the package's own tests (every test calls `await notch.expand()` explicitly)
+confirmed this is wrong: **DynamicNotchKit is a programmatic show/hide API**.
+The `hoverBehavior` option set only controls what happens *while the notch
+is already visible* (keep-visible debounce, haptic feedback, shadow boost).
+There is no "open on cursor-over-physical-notch" hook — the overlay panel
+does not even exist until `expand()` is called.
+
+**Resolution:** add a `NotchHoverDetector` — a thin, transparent, always-on
+`NSPanel` sized to the notch cutout (or a centered strip on non-notched
+Macs) with an `NSTrackingArea` on its content view. Mouse-enter calls
+`notch.expand()`; mouse-exit calls `notch.hide()`, and the island's
+`hoverBehavior: .keepVisible` debounces the hide while the cursor is still
+inside the expanded content.
+
+Panel configuration:
+- `[.borderless, .nonactivatingPanel]`, `backgroundColor = .clear`,
+  `hasShadow = false`, `ignoresMouseEvents = false`.
+- `level = .statusBar` (sits above the menu bar but below DynamicNotchKit's
+  `.screenSaver` expanded panel).
+- `collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary,
+  .ignoresCycle]` so it spans Spaces and fullscreen apps.
+- `HoverDetectorPanel` subclass overrides `canBecomeKey` /`canBecomeMain` to
+  return `false`, and `isReleasedWhenClosed = false`, to prevent focus theft
+  and keep the panel out of the UI-test runner's window-hierarchy scans.
+- Geometry derived from `NSScreen.safeAreaInsets.top`,
+  `auxiliaryTopLeftArea`, `auxiliaryTopRightArea` via
+  `NSScreen+NotchGeometry.swift`. On screen-parameter changes (display
+  connect/disconnect, resolution, arrangement) the panel is torn down and
+  rebuilt.
+- `AppDelegate` skips `islandController.start()` when
+  `XCTestConfigurationFilePath` is set in the environment, so XCUITest
+  launches do not spawn the always-on panel.
+
+New files: `NotchHoverDetector.swift`, `NSScreen+NotchGeometry.swift`.
+Updated: `NotchIslandController.swift` (now owns both the `DynamicNotch`
+and a `NotchHoverDetector`, wires enter/exit closures), `Constants.swift`
+(simulated-notch sizing knobs), `AppDelegate.swift` (test-environment guard).
 
 ## 1. Context
 

@@ -15,13 +15,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private let islandController = NotchIslandController()
 
+    /// When running under XCUITest (XCTestConfigurationFilePath is set by
+    /// the test runner), the island controller's overlay panel interferes
+    /// with the UITest runner's window-hierarchy scans and cleanup. Skip
+    /// starting it there; the test is only verifying LSUIElement launch.
+    private var isRunningUnderTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         installStatusItem()
-        islandController.start()
+        if !isRunningUnderTests {
+            islandController.start()
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        islandController.shutdown()
+        if !isRunningUnderTests {
+            islandController.shutdown()
+        }
         if let statusItem {
             NSStatusBar.system.removeStatusItem(statusItem)
         }

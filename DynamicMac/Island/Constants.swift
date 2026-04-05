@@ -36,4 +36,13 @@ enum Constants {
         /// Fallback curve used when the user has enabled Reduce Motion.
         static let reducedMotion: SwiftUI.Animation = .easeInOut(duration: 0.15)
     }
+
+    enum HoverDetector {
+        /// Width of the simulated-notch hover region on Macs without a
+        /// hardware notch. Roughly matches DynamicNotchKit's floating pill.
+        static let simulatedNotchWidth: CGFloat = 220
+
+        /// Height fallback when the menu bar is zero (edge case).
+        static let simulatedNotchFallbackHeight: CGFloat = 32
+    }
 }
