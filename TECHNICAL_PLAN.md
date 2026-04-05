@@ -9,7 +9,7 @@ Plan compiled 2026-04-05. Consumes two research briefs:
 | Phase | Status | Commit |
 |---|---|---|
 | Phase 0 — Reset template and hygiene | Done | `82675ee` |
-| Phase 1 — MVP overlay + hover + spring expand | Done | (see latest) |
+| Phase 1 — MVP overlay + hover + spring expand | Done | `4278a6a` |
 | Phase 2 — Timers widget | Not started | — |
 | Phase 3 — Now Playing widget | Not started | — |
 | Phase 4 — Settings and polish | Not started | — |
