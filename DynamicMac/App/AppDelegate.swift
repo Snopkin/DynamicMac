@@ -13,7 +13,8 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusItem: NSStatusItem?
-    private let islandController = NotchIslandController()
+    private let timerService = TimerService()
+    private lazy var islandController = NotchIslandController(timerService: timerService)
 
     /// When running under XCUITest (XCTestConfigurationFilePath is set by
     /// the test runner), the island controller's overlay panel interferes
@@ -26,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         installStatusItem()
         if !isRunningUnderTests {
+            timerService.restore()
             islandController.start()
         }
     }
@@ -33,6 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         if !isRunningUnderTests {
             islandController.shutdown()
+            timerService.persistForTermination()
         }
         if let statusItem {
             NSStatusBar.system.removeStatusItem(statusItem)

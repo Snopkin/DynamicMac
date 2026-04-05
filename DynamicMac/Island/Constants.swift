@@ -45,4 +45,23 @@ enum Constants {
         /// Height fallback when the menu bar is zero (edge case).
         static let simulatedNotchFallbackHeight: CGFloat = 32
     }
+
+    enum Timers {
+        /// How often the UI countdown refreshes while a timer is running.
+        /// 1 Hz is plenty for a displayed `mm:ss` readout and keeps the
+        /// main run loop idle 99% of the time.
+        static let displayTickInterval: TimeInterval = 1.0
+
+        /// Tolerance granted to the display tick so macOS can coalesce
+        /// it with other wakeups. 200 ms keeps the readout smooth while
+        /// letting the scheduler batch aggressively on battery.
+        static let displayTickTolerance: TimeInterval = 0.2
+
+        /// Durations offered on the idle timer widget. Minutes.
+        static let presetMinutes: [Int] = [1, 5, 10, 25]
+
+        /// How long to keep the island expanded after a timer finishes,
+        /// before collapsing it back to the hover-to-expand idle state.
+        static let finishedExpandedLinger: TimeInterval = 5
+    }
 }

@@ -10,7 +10,7 @@ Plan compiled 2026-04-05. Consumes two research briefs:
 |---|---|---|
 | Phase 0 — Reset template and hygiene | Done | `82675ee` |
 | Phase 1 — MVP overlay + hover + spring expand | Done | `4278a6a` |
-| Phase 2 — Timers widget | Not started | — |
+| Phase 2 — Timers widget | Done | (see latest) |
 | Phase 3 — Now Playing widget | Not started | — |
 | Phase 4 — Settings and polish | Not started | — |
 | Phase 5 — Polish, performance, and ship | Not started | — |
@@ -67,6 +67,52 @@ New files: `NotchHoverDetector.swift`, `NSScreen+NotchGeometry.swift`.
 Updated: `NotchIslandController.swift` (now owns both the `DynamicNotch`
 and a `NotchHoverDetector`, wires enter/exit closures), `Constants.swift`
 (simulated-notch sizing knobs), `AppDelegate.swift` (test-environment guard).
+
+### Phase 2 timer widget
+
+One active timer at a time. Wall-clock resume across quit/relaunch cycles.
+Notification permission requested on first `start()`. Auto-expand for 5
+seconds on completion.
+
+Layers:
+- `Models/TimerModel.swift` — `Codable` struct with a `State` enum holding
+  an absolute `endDate` while running so reconciliation on relaunch is a
+  `Date.now` comparison rather than a fragile "time remaining" subtraction.
+- `Services/TimerPersistence.swift` — JSON in `UserDefaults` under a single
+  key. One optional timer, so SwiftData is overkill.
+- `Services/NotificationService.swift` — thin `UNUserNotificationCenter`
+  wrapper. Schedules a `UNTimeIntervalNotificationTrigger` at `start()` so
+  the system fires the alert even if DynamicMac is suspended or the lid is
+  closed.
+- `Services/TimerService.swift` — `@Observable @MainActor` with a single
+  1 Hz `Foundation.Timer` (tolerance 200 ms) for the display readout.
+  Exposes `restore()` / `persistForTermination()` for app lifecycle,
+  `start` / `pause` / `resume` / `cancel` / `dismissFinished` for the
+  widget, and an `onTimerFinished` closure that the controller hooks for
+  programmatic expansion. Haptic feedback on start (`.alignment`) and
+  finish (`.levelChange`).
+- `Widgets/TimerWidgetView.swift` — three sub-views: idle (preset pills
+  1/5/10/25 min), active (progress ring + mm:ss readout + pause/cancel),
+  finished (checkmark + label + dismiss).
+- `Widgets/IslandRouterView.swift` — Phase 2 router: shows `TimerWidgetView`
+  when `service.current != nil`, otherwise `HelloWorldWidgetView`. Phase 3
+  will prepend Now Playing to this route.
+- `NotchIslandController` — now owns a `TimerService`, passes it into the
+  `DynamicNotch` expanded closure via `IslandRouterView`, and wires
+  `timerService.onTimerFinished` to a `programmaticLingerTask` that
+  expands the notch, sleeps `finishedExpandedLinger` seconds, then
+  collapses (unless the user started hovering during the linger, in which
+  case hover takes over). Cursor-driven expansion cancels any pending
+  linger so the user can interact with the finished widget without it
+  collapsing under them.
+- `AppDelegate` — constructs `TimerService` up-front and passes it into
+  `NotchIslandController.init`. Calls `restore()` right before
+  `islandController.start()` on launch and `persistForTermination()` on
+  terminate. Test-environment guard still short-circuits the notch path.
+
+Constants additions: `Constants.Timers.displayTickInterval` (1 s),
+`displayTickTolerance` (0.2 s), `presetMinutes` (`[1, 5, 10, 25]`),
+`finishedExpandedLinger` (5 s).
 
 ## 1. Context
 
