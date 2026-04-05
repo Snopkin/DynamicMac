@@ -14,7 +14,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusItem: NSStatusItem?
     private let timerService = TimerService()
-    private lazy var islandController = NotchIslandController(timerService: timerService)
+    private let mediaService = MediaService()
+    private lazy var islandController = NotchIslandController(
+        timerService: timerService,
+        mediaService: mediaService
+    )
 
     /// When running under XCUITest (XCTestConfigurationFilePath is set by
     /// the test runner), the island controller's overlay panel interferes

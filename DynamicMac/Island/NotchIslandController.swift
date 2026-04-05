@@ -41,6 +41,7 @@ import SwiftUI
 final class NotchIslandController {
 
     let timerService: TimerService
+    let mediaService: MediaService
 
     private var notch: DynamicNotch<IslandRouterView, EmptyView, EmptyView>?
     private var hoverDetector: NotchHoverDetector?
@@ -52,19 +53,21 @@ final class NotchIslandController {
     /// the new tail.
     private var pendingNotchTask: Task<Void, Never>?
 
-    init(timerService: TimerService) {
+    init(timerService: TimerService, mediaService: MediaService) {
         self.timerService = timerService
+        self.mediaService = mediaService
     }
 
     func start() {
-        // Strongly capture `timerService` so the SwiftUI view has a stable
-        // reference even if the controller is later torn down.
-        let service = timerService
+        // Strongly capture the services so the SwiftUI view has stable
+        // references even if the controller is later torn down.
+        let timers = timerService
+        let media = mediaService
         let notch = DynamicNotch(
             hoverBehavior: [.keepVisible, .increaseShadow],
             style: .auto
         ) {
-            IslandRouterView(timerService: service)
+            IslandRouterView(timerService: timers, mediaService: media)
         }
         self.notch = notch
 
@@ -82,6 +85,14 @@ final class NotchIslandController {
         timerService.onTimerFinished = { [weak self] in
             self?.handleTimerFinished()
         }
+
+        // Media changes are not currently an attention event — we let
+        // users discover them via hover. Keeping the hook wired (as a
+        // no-op) so a future "briefly peek on track change" behavior
+        // can slot in without re-plumbing.
+        mediaService.onPlaybackStateBecameActive = { /* no-op for MVP */ }
+
+        mediaService.start()
     }
 
     func shutdown() {
@@ -89,6 +100,8 @@ final class NotchIslandController {
         programmaticLingerTask = nil
 
         timerService.onTimerFinished = nil
+        mediaService.onPlaybackStateBecameActive = nil
+        mediaService.stop()
 
         hoverDetector?.stop()
         hoverDetector = nil

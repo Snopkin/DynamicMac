@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		CDDNKPKG0000000000000001 /* DynamicNotchKit in Frameworks */ = {isa = PBXBuildFile; productRef = CDDNKPKG0000000000000003 /* DynamicNotchKit */; };
+		CDMRA00000000000000000002 /* MediaRemoteAdapter.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = CDMRA00000000000000000001 /* MediaRemoteAdapter.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -31,6 +32,7 @@
 		CD4EC83F2F8299810002A7F1 /* DynamicMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DynamicMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CD4EC84E2F8299830002A7F1 /* DynamicMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DynamicMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CD4EC8582F8299830002A7F1 /* DynamicMacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DynamicMacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		CDMRA00000000000000000001 /* MediaRemoteAdapter.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MediaRemoteAdapter.framework; path = External/mediaremote-adapter/MediaRemoteAdapter.framework; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -50,6 +52,20 @@
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		CDMRA00000000000000000003 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				CDMRA00000000000000000002 /* MediaRemoteAdapter.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		CD4EC83C2F8299810002A7F1 /* Frameworks */ = {
@@ -83,6 +99,7 @@
 				CD4EC8412F8299810002A7F1 /* DynamicMac */,
 				CD4EC8512F8299830002A7F1 /* DynamicMacTests */,
 				CD4EC85B2F8299830002A7F1 /* DynamicMacUITests */,
+				CDMRA00000000000000000001 /* MediaRemoteAdapter.framework */,
 				CD4EC8402F8299810002A7F1 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -107,6 +124,7 @@
 				CD4EC83B2F8299810002A7F1 /* Sources */,
 				CD4EC83C2F8299810002A7F1 /* Frameworks */,
 				CD4EC83D2F8299810002A7F1 /* Resources */,
+				CDMRA00000000000000000003 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -411,6 +429,11 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/External/mediaremote-adapter",
+					"$(PROJECT_DIR)/DynamicMac/Resources",
+				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = DynamicMac;
 				INFOPLIST_KEY_LSUIElement = YES;
@@ -445,6 +468,11 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/External/mediaremote-adapter",
+					"$(PROJECT_DIR)/DynamicMac/Resources",
+				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = DynamicMac;
 				INFOPLIST_KEY_LSUIElement = YES;
