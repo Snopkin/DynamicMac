@@ -24,6 +24,19 @@ import SwiftUI
 /// When a timer completes, `TimerService.onTimerFinished` fires and we
 /// programmatically `expand()` the notch for `finishedExpandedLinger`
 /// seconds to draw the user's attention, then collapse.
+///
+/// ## Notch task serialization
+///
+/// All calls into `DynamicNotch.expand()` / `DynamicNotch.hide()` are
+/// threaded through a single serial chain via `enqueueNotchTask`. This
+/// works around a continuation-leak bug in DynamicNotchKit 1.0.0 where
+/// calling `expand()` while a previous `hide()` is still animating
+/// cancels the hide's internal `closePanelTask`, stranding the
+/// `withCheckedContinuation` that `public func hide()` awaits and
+/// triggering a "SWIFT TASK CONTINUATION MISUSE: hide() leaked its
+/// continuation" runtime warning. By guaranteeing that `expand()` only
+/// runs after any in-flight `hide()` has fully completed, the cancel
+/// path inside DynamicNotchKit becomes unreachable.
 @MainActor
 final class NotchIslandController {
 
@@ -33,6 +46,11 @@ final class NotchIslandController {
     private var hoverDetector: NotchHoverDetector?
     private var cursorInsideNotch = false
     private var programmaticLingerTask: Task<Void, Never>?
+
+    /// Tail of the serialized expand/hide task chain. Each new request
+    /// awaits this task before running its operation and then becomes
+    /// the new tail.
+    private var pendingNotchTask: Task<Void, Never>?
 
     init(timerService: TimerService) {
         self.timerService = timerService
@@ -75,11 +93,12 @@ final class NotchIslandController {
         hoverDetector?.stop()
         hoverDetector = nil
 
-        if let notch {
-            Task { @MainActor in
-                await notch.hide()
-            }
-        }
+        // Enqueue the final hide on the serial chain so it runs after any
+        // in-flight expand, then drop the notch reference. Do not cancel
+        // pendingNotchTask — cancellation is the exact code path that
+        // leaks DynamicNotchKit's hide continuation.
+        requestHide()
+        pendingNotchTask = nil
         notch = nil
     }
 
@@ -93,10 +112,7 @@ final class NotchIslandController {
         programmaticLingerTask?.cancel()
         programmaticLingerTask = nil
 
-        guard let notch else { return }
-        Task { @MainActor in
-            await notch.expand()
-        }
+        requestExpand()
     }
 
     private func handleExit() {
@@ -104,31 +120,62 @@ final class NotchIslandController {
 
         // Don't collapse while a programmatic linger is in flight — that
         // task owns the collapse timing.
-        guard programmaticLingerTask == nil, let notch else { return }
-        Task { @MainActor in
-            await notch.hide()
-        }
+        guard programmaticLingerTask == nil else { return }
+        requestHide()
     }
 
     // MARK: - Programmatic attention
 
     private func handleTimerFinished() {
-        guard let notch else { return }
         programmaticLingerTask?.cancel()
 
         programmaticLingerTask = Task { @MainActor [weak self] in
-            await notch.expand()
+            guard let self else { return }
+            self.requestExpand()
+
             try? await Task.sleep(for: .seconds(Constants.Timers.finishedExpandedLinger))
 
-            guard let self else { return }
             self.programmaticLingerTask = nil
 
             // Only collapse if the user isn't currently hovering; if they
             // are, honor the hover state and leave the island open until
             // they move away.
             if !self.cursorInsideNotch {
-                await notch.hide()
+                self.requestHide()
             }
+        }
+    }
+
+    // MARK: - Serialized notch operations
+
+    /// Appends a `notch.expand()` call to the serial chain. Returns
+    /// immediately; the expand happens after any previously-queued hide.
+    private func requestExpand() {
+        enqueueNotchOperation { notch in
+            await notch.expand()
+        }
+    }
+
+    /// Appends a `notch.hide()` call to the serial chain.
+    private func requestHide() {
+        enqueueNotchOperation { notch in
+            await notch.hide()
+        }
+    }
+
+    /// Core enqueue primitive. Chains the new operation after the current
+    /// tail, captures the notch strongly for the duration of the call so
+    /// shutdown's `self.notch = nil` doesn't race the operation, and
+    /// installs the new task as the chain tail.
+    private func enqueueNotchOperation(
+        _ operation: @escaping @MainActor (DynamicNotch<IslandRouterView, EmptyView, EmptyView>) async -> Void
+    ) {
+        guard let notch else { return }
+        let previous = pendingNotchTask
+
+        pendingNotchTask = Task { @MainActor in
+            _ = await previous?.value
+            await operation(notch)
         }
     }
 }
