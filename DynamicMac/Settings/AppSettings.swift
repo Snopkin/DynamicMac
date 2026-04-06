@@ -140,6 +140,54 @@ final class AppSettings {
         }
     }
 
+    // MARK: - Clipboard
+
+    /// Maximum number of unpinned entries kept in the clipboard history.
+    var clipboardMaxCount: Int {
+        didSet {
+            guard clipboardMaxCount != oldValue else { return }
+            defaults.set(clipboardMaxCount, forKey: Keys.clipboardMaxCount)
+        }
+    }
+
+    /// How long unpinned entries are kept before automatic expiry. Zero
+    /// means "never expire" — entries are only removed by the count cap.
+    var clipboardExpireInterval: TimeInterval {
+        didSet {
+            guard clipboardExpireInterval != oldValue else { return }
+            defaults.set(clipboardExpireInterval, forKey: Keys.clipboardExpireInterval)
+        }
+    }
+
+    /// Bundle identifiers of apps whose clipboard writes are silently
+    /// ignored. Typical use: password managers (1Password, Bitwarden).
+    var clipboardIgnoredApps: [String] {
+        didSet {
+            guard clipboardIgnoredApps != oldValue else { return }
+            if let data = try? JSONEncoder().encode(clipboardIgnoredApps) {
+                defaults.set(data, forKey: Keys.clipboardIgnoredApps)
+            }
+        }
+    }
+
+    /// When enabled, the pager auto-switches to the Now Playing widget
+    /// whenever playback starts. Useful for music-centric users; others
+    /// may find the jump disruptive.
+    var mediaAutoSwitchOnPlay: Bool {
+        didSet {
+            guard mediaAutoSwitchOnPlay != oldValue else { return }
+            defaults.set(mediaAutoSwitchOnPlay, forKey: Keys.mediaAutoSwitchOnPlay)
+        }
+    }
+
+    // MARK: - Quick Ask
+
+    /// Whether the user has set their own API key via Settings. This is a
+    /// read-through to the Keychain — the actual key never touches
+    /// `UserDefaults`. The property triggers observation so SwiftUI views
+    /// update when the key changes.
+    var quickAskHasUserKey: Bool = AIKeyProvider.hasUserKey
+
     // MARK: - Launcher
 
     /// User-picked list of apps pinned to the launcher widget row.
@@ -172,6 +220,10 @@ final class AppSettings {
         self.widgetOrder = Self.decodeWidgetOrder(defaults.array(forKey: Keys.widgetOrder) as? [String])
         self.widgetEnabled = Self.decodeWidgetEnabled(defaults.dictionary(forKey: Keys.widgetEnabled) as? [String: Bool])
         self.mediaNowPlayingEnabled = (defaults.object(forKey: Keys.mediaNowPlayingEnabled) as? Bool) ?? Defaults.mediaNowPlayingEnabled
+        self.mediaAutoSwitchOnPlay = (defaults.object(forKey: Keys.mediaAutoSwitchOnPlay) as? Bool) ?? Defaults.mediaAutoSwitchOnPlay
+        self.clipboardMaxCount = (defaults.object(forKey: Keys.clipboardMaxCount) as? Int) ?? Defaults.clipboardMaxCount
+        self.clipboardExpireInterval = (defaults.object(forKey: Keys.clipboardExpireInterval) as? TimeInterval) ?? Defaults.clipboardExpireInterval
+        self.clipboardIgnoredApps = Self.decodeClipboardIgnoredApps(defaults.data(forKey: Keys.clipboardIgnoredApps))
         self.pomodoroConfig = Self.decodePomodoroConfig(defaults.data(forKey: Keys.pomodoroConfig))
         self.launcherEntries = Self.decodeLauncherEntries(defaults.data(forKey: Keys.launcherEntries))
 

@@ -7,6 +7,7 @@
 
 import AppKit
 import Foundation
+import os
 import SwiftUI
 
 /// Keys, defaults, and persistence helpers for `AppSettings`. Split from
@@ -23,6 +24,10 @@ extension AppSettings {
         static let widgetOrder = "settings.widgetOrder"
         static let widgetEnabled = "settings.widgetEnabled"
         static let mediaNowPlayingEnabled = "settings.mediaNowPlayingEnabled"
+        static let mediaAutoSwitchOnPlay = "settings.mediaAutoSwitchOnPlay"
+        static let clipboardMaxCount = "settings.clipboardMaxCount"
+        static let clipboardExpireInterval = "settings.clipboardExpireInterval"
+        static let clipboardIgnoredApps = "settings.clipboardIgnoredApps"
         static let pomodoroConfig = "settings.pomodoroConfig"
         static let launcherEntries = "settings.launcherEntries"
     }
@@ -34,6 +39,10 @@ extension AppSettings {
         static let showIdlePill = false
         static let islandTintColor = Color(.sRGB, red: 1.0, green: 1.0, blue: 1.0, opacity: 1.0)
         static let mediaNowPlayingEnabled = true
+        static let mediaAutoSwitchOnPlay = false
+        static let clipboardMaxCount = 50
+        static let clipboardExpireInterval: TimeInterval = 86400  // 24 hours
+        static let clipboardIgnoredApps: [String] = []
         static let pomodoroConfig = PomodoroConfig.default
         static let launcherEntries: [AppLauncherEntry] = []
     }
@@ -48,7 +57,13 @@ extension AppSettings {
 
     static func decodeWidgetOrder(_ raw: [String]?) -> [WidgetID] {
         guard let raw else { return WidgetID.defaultOrder }
-        let decoded = raw.compactMap(WidgetID.init(rawValue:))
+        let decoded = raw.compactMap { rawValue -> WidgetID? in
+            let result = WidgetID(rawValue: rawValue)
+            if result == nil {
+                DMLog.persistence.warning("Dropped unknown widget from persisted order: \(rawValue, privacy: .public)")
+            }
+            return result
+        }
         // Re-append any widgets added in a newer version that the user's
         // persisted order doesn't know about yet. Preserves their existing
         // preferences and avoids silently dropping new widgets.
@@ -68,6 +83,16 @@ extension AppSettings {
             }
         }
         return result
+    }
+
+    // MARK: - Clipboard ignored apps
+
+    static func decodeClipboardIgnoredApps(_ data: Data?) -> [String] {
+        guard let data,
+              let apps = try? JSONDecoder().decode([String].self, from: data) else {
+            return Defaults.clipboardIgnoredApps
+        }
+        return apps
     }
 
     // MARK: - Pomodoro config

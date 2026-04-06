@@ -52,14 +52,7 @@ extension NotchIslandController {
     /// accumulate within a single gesture before a page commit fires.
     /// Tuned to require a deliberate swipe — small hesitation pans
     /// while reading a widget do not cycle.
-    private static let scrollSwipeThreshold: CGFloat = 40
-
-    /// Minimum time between scroll-driven commits. After a commit,
-    /// *all* scroll events are swallowed for this duration regardless
-    /// of gesture phase. Set high enough to eat the full momentum tail
-    /// that trackpads deliver after a flick (~0.5–1s). One deliberate
-    /// swipe = one widget cycle.
-    private static let scrollCommitCooldown: TimeInterval = 0.8
+    private static let scrollSwipeThreshold: CGFloat = 50
 
     /// Install both `.scrollWheel` monitors (local + global). Called
     /// from `start()` once the notch is constructed. Idempotent —
@@ -108,7 +101,7 @@ extension NotchIslandController {
             self.globalScrollMonitor = nil
         }
         scrollAccumulatedDeltaX = 0
-        scrollLastCommitAt = nil
+        scrollGestureCommitted = false
     }
 
     /// Shared scroll handler body used by both monitors. Returns `true`
@@ -118,6 +111,12 @@ extension NotchIslandController {
     /// consume). Returns `false` when the event is a pass-through we
     /// didn't act on — scroll happened outside the panel, wrong
     /// state, vertical-dominated pan, etc.
+    ///
+    /// One-swipe-one-cycle is enforced by the `scrollGestureCommitted`
+    /// flag: once the threshold is crossed and a commit fires, all
+    /// remaining `.changed` events and the momentum tail are swallowed
+    /// until the gesture ends. A new `.began` resets the flag, so quick
+    /// consecutive swipes (lift-and-re-swipe) advance immediately.
     ///
     /// `source` is just for the log line so we can tell which path
     /// drove the commit during diagnosis.
@@ -129,15 +128,6 @@ extension NotchIslandController {
         }
 
         // Cursor must be inside the expanded panel's screen frame.
-        // This is the authoritative "is the user looking at widgets?"
-        // signal — more reliable than `intendedState`, which the hover
-        // detector flips to `.hidden` the moment the cursor crosses
-        // from the notch strip into the expanded island body (DNK's
-        // `.keepVisible` keeps the panel on screen during that window,
-        // but our chain is already converging on hidden). If the panel
-        // isn't on screen, `notch?.windowController?.window?.frame` is
-        // nil or the cursor is outside it, so this gate alone covers
-        // both "island is hidden" and "user is scrolling elsewhere".
         guard let panelFrame = notch?.windowController?.window?.frame else {
             return false
         }
@@ -146,32 +136,40 @@ extension NotchIslandController {
             return false
         }
 
-        // After a commit, swallow everything for the cooldown window.
-        // This is the primary one-swipe-one-cycle guard. Checked before
-        // phase handling or accumulation so momentum tails, late
-        // `.changed` events, and even new `.began` phases that arrive
-        // during the cooldown are all eaten.
-        if let scrollLastCommitAt,
-           Date.now.timeIntervalSince(scrollLastCommitAt) < Self.scrollCommitCooldown {
-            return true
-        }
-
-        // Reset the accumulator on gesture boundaries so each discrete
-        // finger-down-to-up interaction is counted on its own.
+        // Handle gesture boundaries: reset state on a new gesture so
+        // each finger-down-to-up is independent. This is what allows
+        // quick consecutive swipes — the moment fingers lift and touch
+        // again, the commit flag clears and a new cycle can fire.
         switch event.phase {
         case .began, .mayBegin:
             scrollAccumulatedDeltaX = 0
+            scrollGestureCommitted = false
         case .ended, .cancelled:
             scrollAccumulatedDeltaX = 0
+            scrollGestureCommitted = false
             return true
         default:
             break
         }
 
+        // After committing within this gesture, eat everything until
+        // the gesture ends. This is the primary one-swipe-one-cycle
+        // guard — prevents a long or fast swipe from advancing 2+
+        // widgets.
+        if scrollGestureCommitted {
+            return true
+        }
+
+        // Momentum events (`.phase == []`, `.momentumPhase != []`)
+        // arrive after the user lifts their fingers. They should never
+        // trigger a new commit — they belong to the previous gesture
+        // whose commit flag may have already been cleared by `.ended`.
+        if event.phase == [] && event.momentumPhase != [] {
+            return true
+        }
+
         // Ignore horizontal pans dominated by vertical motion — the
         // user is probably scrolling inside the widget, not cycling.
-        // 1.5× ratio matches the threshold Apple uses in their own
-        // paging views.
         let absX = abs(event.scrollingDeltaX)
         let absY = abs(event.scrollingDeltaY)
         guard absX > absY * 1.5 else {
@@ -182,19 +180,20 @@ extension NotchIslandController {
         // two-finger swipe (content pans right → "previous page" in a
         // natural-scrolling paging model). Invert so positive values
         // accumulate toward "next" and the gesture matches the
-        // swipe-left-to-advance convention familiar from iOS. Users
-        // who prefer the opposite can flip it via the OS natural-
-        // scrolling setting, which already inverts `scrollingDeltaX`.
+        // swipe-left-to-advance convention familiar from iOS.
         scrollAccumulatedDeltaX -= event.scrollingDeltaX
 
-        let count = appSettings.enabledWidgetsInPriorityOrder.count
-        guard count > 1 else { return false }
+        // Snapshot the enabled widget list once so a concurrent settings
+        // change can't give us a stale count between threshold check
+        // and the cycle() call.
+        let enabledWidgets = appSettings.enabledWidgetsInPriorityOrder
+        guard enabledWidgets.count > 1 else { return false }
 
         if scrollAccumulatedDeltaX >= Self.scrollSwipeThreshold {
-            commitScrollCycle(delta: 1, count: count, source: source)
+            commitScrollCycle(delta: 1, count: enabledWidgets.count, source: source)
             return true
         } else if scrollAccumulatedDeltaX <= -Self.scrollSwipeThreshold {
-            commitScrollCycle(delta: -1, count: count, source: source)
+            commitScrollCycle(delta: -1, count: enabledWidgets.count, source: source)
             return true
         }
 
@@ -205,13 +204,8 @@ extension NotchIslandController {
 
     private func commitScrollCycle(delta: Int, count: Int, source: String) {
         scrollAccumulatedDeltaX = 0
-        scrollLastCommitAt = Date.now
+        scrollGestureCommitted = true
         DMLog.island.debug("scroll cycle delta=\(delta) count=\(count) source=\(source, privacy: .public)")
         routerState.cycle(by: delta, count: count)
     }
-
-    // Widget count is read directly from
-    // `appSettings.enabledWidgetsInPriorityOrder.count` — the single
-    // source of truth that both the router view and this scroll monitor
-    // share. No local duplicate filter needed.
 }

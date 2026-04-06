@@ -5,6 +5,7 @@
 //  Created by Lidor Nir Shalom on 05/04/2026.
 //
 
+import AppKit
 import SwiftUI
 
 /// Routes the expanded-island content to the currently-selected enabled
@@ -33,6 +34,9 @@ struct IslandRouterView: View {
     @Bindable var powerMonitor: PowerMonitor
     @Bindable var pomodoroService: PomodoroService
     @Bindable var appLauncherService: AppLauncherService
+    @Bindable var clipboardService: ClipboardService
+    @Bindable var aiService: AIService
+    let quickAskPanelController: QuickAskResponsePanelController
     @Bindable var routerState: IslandRouterState
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -79,6 +83,33 @@ struct IslandRouterView: View {
         .onChange(of: currentPomodoro == nil) { _, _ in
             biasSelectionTowardLiveContent()
         }
+        // Auto-switch to Now Playing when playback starts (if enabled).
+        .onChange(of: mediaService.current != nil) { wasPlaying, isPlaying in
+            if isPlaying, !wasPlaying, appSettings.mediaAutoSwitchOnPlay {
+                switchToNowPlaying()
+            }
+        }
+        // On first appearance, if media is already playing and auto-switch
+        // is on, jump to Now Playing. The onChange above only fires on
+        // transitions, so it misses the "already playing on launch" case.
+        .onAppear {
+            if mediaService.current != nil, appSettings.mediaAutoSwitchOnPlay {
+                switchToNowPlaying()
+            }
+        }
+        // Keep the response panel sized to fit the streaming content.
+        .onChange(of: aiService.currentResponse) { _, _ in
+            if quickAskPanelController.isVisible {
+                quickAskPanelController.updateSize()
+            }
+        }
+        // Dismiss the response panel when streaming finishes and the user
+        // clears the response.
+        .onChange(of: aiService.currentResponse.isEmpty) { _, isEmpty in
+            if isEmpty {
+                quickAskPanelController.dismiss()
+            }
+        }
     }
 
     /// Resolved animation for all widget-level transitions. Swaps to a
@@ -107,7 +138,7 @@ struct IslandRouterView: View {
         let safeIndex = min(max(routerState.selectedIndex, 0), widgets.count - 1)
         let widget = widgets[safeIndex]
 
-        VStack(spacing: 6) {
+        VStack(spacing: 4) {
             content(for: widget)
                 .id(widget) // force SwiftUI to treat each widget as a distinct subtree
                 .transition(.opacity)
@@ -156,7 +187,6 @@ struct IslandRouterView: View {
                 routerState.cycle(by: 1, count: widgets.count)
             }
         }
-        .padding(.bottom, 4)
         .accessibilityElement(children: .contain)
     }
 
@@ -260,6 +290,10 @@ struct IslandRouterView: View {
             return pomodoroService.current != nil
         case .appLauncher:
             return !appLauncherService.entries.isEmpty
+        case .clipboard:
+            return !clipboardService.allEntries.isEmpty
+        case .quickAsk:
+            return aiService.isStreaming || !aiService.currentResponse.isEmpty
         }
     }
 
@@ -274,9 +308,16 @@ struct IslandRouterView: View {
             return timerService.lastActivationDate
         case .pomodoro:
             return pomodoroService.lastActivationDate
-        case .nowPlaying, .appLauncher:
+        case .nowPlaying, .appLauncher, .clipboard, .quickAsk:
             return nil
         }
+    }
+
+    /// Jump to the Now Playing widget if it's enabled.
+    private func switchToNowPlaying() {
+        let widgets = enabledWidgets
+        guard let index = widgets.firstIndex(of: .nowPlaying) else { return }
+        routerState.selectedIndex = index
     }
 
     // MARK: - Content
@@ -299,6 +340,65 @@ struct IslandRouterView: View {
                 service: appLauncherService,
                 animation: islandAnimation
             )
+        case .clipboard:
+            ClipboardWidgetView(
+                service: clipboardService,
+                animation: islandAnimation
+            )
+        case .quickAsk:
+            QuickAskWidgetView(
+                service: aiService,
+                animation: islandAnimation,
+                onSubmit: { question in
+                    handleQuickAskSubmit(question)
+                },
+                onShowHistory: {
+                    handleQuickAskShowHistory()
+                }
+            )
         }
+    }
+
+    // MARK: - Quick Ask
+
+    private func handleQuickAskSubmit(_ question: String) {
+        aiService.ask(question)
+        showResponsePanel()
+    }
+
+    /// Show the response panel (for both new questions and history browsing).
+    private func showResponsePanel() {
+        let responseView = QuickAskResponseView(
+            service: aiService,
+            onClose: { [quickAskPanelController, aiService] in
+                quickAskPanelController.dismiss()
+                aiService.clearCurrentResponse()
+            },
+            onCopy: { text in
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(text, forType: .string)
+            },
+            countdownProgress: quickAskPanelController.makeCountdownBinding()
+        )
+        quickAskPanelController.onAutoDismiss = { [quickAskPanelController, aiService] in
+            quickAskPanelController.dismiss()
+            aiService.clearCurrentResponse()
+        }
+        quickAskPanelController.show(content: responseView)
+    }
+
+    /// Open the response panel showing history. Called from the widget's
+    /// history button.
+    private func handleQuickAskShowHistory() {
+        guard !aiService.history.isEmpty else { return }
+        // Point to the last history entry.
+        aiService.historyIndex = aiService.history.count - 1
+        // Populate currentQuestion/Response from the last entry so the
+        // panel has something to show.
+        if aiService.currentResponse.isEmpty {
+            let last = aiService.history.last!
+            aiService.restoreFromHistory(last)
+        }
+        showResponsePanel()
     }
 }

@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import os
 
 /// Drives `ungive/mediaremote-adapter` by spawning `/usr/bin/perl` against
 /// the vendored script and framework, reading newline-delimited JSON
@@ -42,6 +43,12 @@ final class MediaRemoteAdapterBridge: MediaSource {
     private var stdoutPipe: Pipe?
     private var stderrPipe: Pipe?
     private var stdoutBuffer = Data()
+
+    /// Tracks recent terminations for exponential backoff. If the adapter
+    /// crashes repeatedly (e.g. macOS update breaks it), we stop
+    /// respawning after `maxConsecutiveRestarts` to avoid a fork loop.
+    private var consecutiveRestarts = 0
+    private static let maxConsecutiveRestarts = 5
 
     /// Running merged state. Mirrors whatever the adapter last told us
     /// about the now-playing session, so incoming diffs can be applied.
@@ -164,10 +171,16 @@ final class MediaRemoteAdapterBridge: MediaSource {
         currentPayload.removeAll()
         onUpdate?(nil)
 
-        // Auto-restart with a short backoff so a broken mediaremoted or a
-        // macOS update that breaks the adapter does not spin-loop fork.
+        consecutiveRestarts += 1
+        if consecutiveRestarts > Self.maxConsecutiveRestarts {
+            DMLog.persistence.error("Media adapter crashed \(self.consecutiveRestarts) times — giving up")
+            return
+        }
+
+        // Exponential backoff: 2s, 4s, 8s, 16s, 32s.
+        let delay = TimeInterval(2 << (consecutiveRestarts - 1))
         Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(2))
+            try? await Task.sleep(for: .seconds(delay))
             self?.spawnStream()
         }
     }
@@ -175,6 +188,10 @@ final class MediaRemoteAdapterBridge: MediaSource {
     // MARK: - stdout framing and envelope decode
 
     private func ingestStdout(_ data: Data) {
+        // Receiving data means the adapter is alive — reset the backoff
+        // counter so a single transient crash doesn't accumulate toward
+        // the give-up threshold.
+        consecutiveRestarts = 0
         stdoutBuffer.append(data)
 
         while let newlineIndex = stdoutBuffer.firstIndex(of: 0x0A) {

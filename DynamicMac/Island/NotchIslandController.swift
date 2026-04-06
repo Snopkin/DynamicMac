@@ -21,8 +21,8 @@ import SwiftUI
 ///
 /// - **`+Chain.swift`** — serialized expand/hide task chain, working
 ///   around a continuation-leak bug in DynamicNotchKit 1.0.0.
-/// - **`+Hover.swift`** — enter/exit handlers with debounced exit and
-///   phantom re-enter suppression.
+/// - **`+Hover.swift`** — enter/exit handlers with a 60 Hz cursor
+///   tracker for the expanded panel body.
 /// - **`+Attention.swift`** — programmatic linger on timer/pomodoro
 ///   completion.
 /// - **`+Scroll.swift`** — trackpad swipe cycling via local + global
@@ -36,6 +36,13 @@ final class NotchIslandController {
     let powerMonitor: PowerMonitor
     let pomodoroService: PomodoroService
     let appLauncherService: AppLauncherService
+    let clipboardService: ClipboardService
+    let aiService: AIService
+
+    /// Manages the floating glass panel that shows AI responses below the
+    /// island. Exposed so the hover extension can include it in the
+    /// interaction rect.
+    let quickAskPanelController = QuickAskResponsePanelController()
 
     /// Shared router selection state. Owned here (not as `@State` inside
     /// `IslandRouterView`) because the trackpad-scroll `NSEvent` local
@@ -77,13 +84,9 @@ final class NotchIslandController {
     /// attention extension can manage it from a sibling file.
     var programmaticLingerTask: Task<Void, Never>?
 
-    /// 60 Hz timer that polls cursor position to detect when it leaves
+    /// 30 Hz timer that polls cursor position to detect when it leaves
     /// the DNK panel body. See `+Hover.swift` for the full story.
     var panelExitTimer: Foundation.Timer?
-
-    /// Legacy mouse-moved monitors (kept for cleanup in stopPanelExitTracker).
-    var panelExitMonitor: Any?
-    var panelExitLocalMonitor: Any?
 
     /// Handles returned by `NSEvent.addLocalMonitorForEvents` and
     /// `addGlobalMonitorForEvents`. Both are stored so `shutdown()` can
@@ -103,10 +106,11 @@ final class NotchIslandController {
     /// Mutated from `NotchIslandController+Scroll.swift`.
     var scrollAccumulatedDeltaX: CGFloat = 0
 
-    /// Wall-clock timestamp of the most recent committed scroll-driven
-    /// page change. Used to swallow momentum-scroll tails so a single
-    /// flick cycles exactly one widget. Mutated from the scroll extension.
-    var scrollLastCommitAt: Date?
+    /// Set to `true` after a scroll gesture commits a page cycle. All
+    /// remaining events in the same gesture are swallowed. Cleared on
+    /// the next `.began` so quick consecutive swipes work immediately.
+    /// Mutated from the scroll extension.
+    var scrollGestureCommitted = false
 
     /// Read by the attention extension to decide whether to auto-collapse
     /// once the linger expires.
@@ -118,7 +122,9 @@ final class NotchIslandController {
         appSettings: AppSettings,
         powerMonitor: PowerMonitor,
         pomodoroService: PomodoroService,
-        appLauncherService: AppLauncherService
+        appLauncherService: AppLauncherService,
+        clipboardService: ClipboardService,
+        aiService: AIService
     ) {
         self.timerService = timerService
         self.mediaService = mediaService
@@ -126,6 +132,8 @@ final class NotchIslandController {
         self.powerMonitor = powerMonitor
         self.pomodoroService = pomodoroService
         self.appLauncherService = appLauncherService
+        self.clipboardService = clipboardService
+        self.aiService = aiService
     }
 
     func start() {
@@ -137,6 +145,9 @@ final class NotchIslandController {
         let power = powerMonitor
         let pomodoro = pomodoroService
         let launcher = appLauncherService
+        let clipboard = clipboardService
+        let ai = aiService
+        let askPanel = quickAskPanelController
         let router = routerState
         let notch = DynamicNotch(
             hoverBehavior: [.increaseShadow],
@@ -149,6 +160,9 @@ final class NotchIslandController {
                 powerMonitor: power,
                 pomodoroService: pomodoro,
                 appLauncherService: launcher,
+                clipboardService: clipboard,
+                aiService: ai,
+                quickAskPanelController: askPanel,
                 routerState: router
             )
         }
@@ -185,6 +199,8 @@ final class NotchIslandController {
     }
 
     func shutdown() {
+        quickAskPanelController.dismiss()
+
         programmaticLingerTask?.cancel()
         programmaticLingerTask = nil
         stopPanelExitTracker()
@@ -212,8 +228,8 @@ final class NotchIslandController {
     //
     // `handleEnter` and `handleExit` live in
     // `NotchIslandController+Hover.swift`. They manage
-    // `cursorInsideNotch`, `lastExitAt`, `pendingExitTask`, and
-    // coordinate with `programmaticLingerTask`.
+    // `cursorInsideNotch`, `panelExitTimer`, and coordinate with
+    // `programmaticLingerTask`.
 
     // MARK: - Programmatic attention
     //

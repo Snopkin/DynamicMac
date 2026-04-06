@@ -37,3 +37,6 @@ fastlane/screenshots/**/*.png
 
 
 project.pbxproj
+
+# Build secrets (API key — never commit the real plist, only the template)
+DynamicMac/Secrets.plist

@@ -166,6 +166,8 @@ extension NSScreen {
         if let notched = NSScreen.screens.first(where: { $0.dmHasHardwareNotch }) {
             return notched
         }
-        return NSScreen.main ?? NSScreen.screens[0]
+        // Safe subscript: `NSScreen.main` is nil only when no displays
+        // are attached, but guard against empty `.screens` just in case.
+        return NSScreen.main ?? NSScreen.screens.first ?? NSScreen()
     }
 }

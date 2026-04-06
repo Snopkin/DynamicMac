@@ -23,6 +23,8 @@ enum WidgetID: String, CaseIterable, Identifiable, Codable {
     case nowPlaying
     case pomodoro
     case appLauncher
+    case clipboard
+    case quickAsk
 
     var id: String { rawValue }
 
@@ -33,6 +35,8 @@ enum WidgetID: String, CaseIterable, Identifiable, Codable {
         case .nowPlaying: return "Now Playing"
         case .pomodoro: return "Pomodoro"
         case .appLauncher: return "App Launcher"
+        case .clipboard: return "Clipboard"
+        case .quickAsk: return "Quick Ask"
         }
     }
 
@@ -40,7 +44,8 @@ enum WidgetID: String, CaseIterable, Identifiable, Codable {
     /// Pomodoro wins first — a running cycle is the most attention-
     /// demanding state a user has explicitly chosen. Timers are second
     /// for the same reason at lower urgency. Now Playing is ambient
-    /// background activity. App Launcher is the idle fallback that
-    /// occupies the island when nothing ephemeral is happening.
-    static let defaultOrder: [WidgetID] = [.pomodoro, .timer, .nowPlaying, .appLauncher]
+    /// background activity. Quick Ask and Clipboard are utilities.
+    /// App Launcher is the idle fallback that occupies the island when
+    /// nothing ephemeral is happening.
+    static let defaultOrder: [WidgetID] = [.pomodoro, .timer, .nowPlaying, .quickAsk, .clipboard, .appLauncher]
 }

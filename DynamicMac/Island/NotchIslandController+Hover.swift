@@ -19,7 +19,7 @@ import os
 /// When the cursor exits the strip into the expanded body,
 /// `mouseExited` fires but the user is still inside the island. We
 /// detect this by checking a computed "interaction rect" (the visible
-/// content area, NOT the oversized DNK window frame). A 60 Hz timer
+/// content area, NOT the oversized DNK window frame). A 30 Hz timer
 /// polls the cursor position; the instant it leaves → `requestHide()`.
 ///
 /// DynamicNotchKit sizes its window at half the screen dimensions and
@@ -47,18 +47,33 @@ extension NotchIslandController {
         let contentHeight: CGFloat = 120
         let dnkSafeArea: CGFloat = 15
 
-        // Width: our content is 360pt but DNK adds corner radii,
+        // Width: our content is 340pt but DNK adds corner radii,
         // safe-area insets, and padding. Use the strip width extended
         // generously on each side.
-        let interactionWidth = max(strip.width, Constants.Island.expandedContentWidth) + 80
+        let interactionWidth = max(strip.width, Constants.Island.expandedContentWidth) + 70
         let interactionHeight = strip.height + contentHeight + dnkSafeArea
 
-        return NSRect(
+        var rect = NSRect(
             x: strip.midX - interactionWidth / 2,
             y: strip.maxY - interactionHeight,
             width: interactionWidth,
             height: interactionHeight
         )
+
+        // Extend to include the Quick Ask response panel if visible, so
+        // the island stays open while the user reads the AI answer.
+        if quickAskPanelController.isVisible {
+            let panelFrame = quickAskPanelController.panelFrame
+            let unionMinY = min(rect.minY, panelFrame.minY)
+            rect = NSRect(
+                x: min(rect.minX, panelFrame.minX),
+                y: unionMinY,
+                width: max(rect.maxX, panelFrame.maxX) - min(rect.minX, panelFrame.minX),
+                height: rect.maxY - unionMinY
+            )
+        }
+
+        return rect
     }
 
     // MARK: - Hover handlers
@@ -109,7 +124,7 @@ extension NotchIslandController {
 
     func startPanelExitTracker() {
         stopPanelExitTracker()
-        let timer = Foundation.Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+        let timer = Foundation.Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
             self?.tickPanelExitCheck()
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -144,16 +159,4 @@ extension NotchIslandController {
         }
     }
 
-    // MARK: - Legacy cleanup
-
-    func removePanelExitMonitor() {
-        if let monitor = panelExitMonitor {
-            NSEvent.removeMonitor(monitor)
-            panelExitMonitor = nil
-        }
-        if let monitor = panelExitLocalMonitor {
-            NSEvent.removeMonitor(monitor)
-            panelExitLocalMonitor = nil
-        }
-    }
 }

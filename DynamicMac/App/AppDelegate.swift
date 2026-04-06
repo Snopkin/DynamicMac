@@ -30,18 +30,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let powerMonitor = PowerMonitor()
     private lazy var pomodoroService = PomodoroService(settings: appSettings)
     private lazy var appLauncherService = AppLauncherService(settings: appSettings)
+    private lazy var clipboardService = ClipboardService(settings: appSettings)
+    private lazy var aiService = AIService(settings: appSettings)
     private lazy var islandController = NotchIslandController(
         timerService: timerService,
         mediaService: mediaService,
         appSettings: appSettings,
         powerMonitor: powerMonitor,
         pomodoroService: pomodoroService,
-        appLauncherService: appLauncherService
+        appLauncherService: appLauncherService,
+        clipboardService: clipboardService,
+        aiService: aiService
     )
     private lazy var settingsWindowController = SettingsWindowController(
         settings: appSettings,
         mediaService: mediaService,
-        appLauncherService: appLauncherService
+        appLauncherService: appLauncherService,
+        clipboardService: clipboardService
     )
 
     /// Sparkle's top-level controller. Started eagerly so Sparkle can
@@ -71,6 +76,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             _ = updaterController
             timerService.restore()
             pomodoroService.restore()
+            clipboardService.start()
             islandController.start()
         }
     }
@@ -80,6 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             islandController.shutdown()
             timerService.persistForTermination()
             pomodoroService.persistForTermination()
+            clipboardService.persistForTermination()
         }
         powerMonitor.stop()
         if let statusItem {
@@ -92,12 +99,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func installStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.image = NSImage(
-            systemSymbolName: "oval.fill",
-            accessibilityDescription: "DynamicMac"
-        )
+        item.button?.image = makeMenuBarIcon()
         item.menu = buildMenu()
         statusItem = item
+    }
+
+    /// Draws the DynamicMac notch-pill icon for the menu bar. Matches the
+    /// app icon's central pill shape — a wide rounded rectangle — rendered
+    /// as a template image so macOS handles vibrancy and dark/light mode.
+    private func makeMenuBarIcon() -> NSImage {
+        let size = NSSize(width: 18, height: 18)
+        let image = NSImage(size: size, flipped: false) { bounds in
+            let pillWidth: CGFloat = 14
+            let pillHeight: CGFloat = 6
+            let cornerRadius: CGFloat = 3
+            let pillRect = NSRect(
+                x: (bounds.width - pillWidth) / 2,
+                y: (bounds.height - pillHeight) / 2,
+                width: pillWidth,
+                height: pillHeight
+            )
+            let path = NSBezierPath(roundedRect: pillRect, xRadius: cornerRadius, yRadius: cornerRadius)
+            NSColor.black.setFill()
+            path.fill()
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = "DynamicMac"
+        return image
     }
 
     private func buildMenu() -> NSMenu {

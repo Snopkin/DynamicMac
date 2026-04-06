@@ -16,6 +16,7 @@ struct SettingsView: View {
     @Bindable var settings: AppSettings
     let mediaService: MediaService
     @Bindable var appLauncherService: AppLauncherService
+    @Bindable var clipboardService: ClipboardService
 
     var body: some View {
         TabView {
@@ -34,12 +35,18 @@ struct SettingsView: View {
             LauncherSettingsTab(settings: settings, launcher: appLauncherService)
                 .tabItem { Label("Launcher", systemImage: "square.grid.3x3.fill") }
 
+            ClipboardSettingsTab(settings: settings, clipboardService: clipboardService)
+                .tabItem { Label("Clipboard", systemImage: "doc.on.clipboard") }
+
+            QuickAskSettingsTab(settings: settings)
+                .tabItem { Label("Quick Ask", systemImage: "sparkles") }
+
             MediaSettingsTab(settings: settings, mediaService: mediaService)
                 .tabItem { Label("Media", systemImage: "music.note") }
 
             AboutSettingsTab()
                 .tabItem { Label("About", systemImage: "info.circle") }
         }
-        .frame(width: 520, height: 400)
+        .frame(minWidth: 580, minHeight: 440)
     }
 }

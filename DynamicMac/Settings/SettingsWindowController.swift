@@ -28,6 +28,7 @@ final class SettingsWindowController {
     private let settings: AppSettings
     private let mediaService: MediaService
     private let appLauncherService: AppLauncherService
+    private let clipboardService: ClipboardService
 
     private var window: NSWindow?
     private var willCloseObserver: NSObjectProtocol?
@@ -35,11 +36,13 @@ final class SettingsWindowController {
     init(
         settings: AppSettings,
         mediaService: MediaService,
-        appLauncherService: AppLauncherService
+        appLauncherService: AppLauncherService,
+        clipboardService: ClipboardService
     ) {
         self.settings = settings
         self.mediaService = mediaService
         self.appLauncherService = appLauncherService
+        self.clipboardService = clipboardService
     }
 
     // No deinit: this controller is owned for the app's lifetime by
@@ -64,18 +67,22 @@ final class SettingsWindowController {
             rootView: SettingsView(
                 settings: settings,
                 mediaService: mediaService,
-                appLauncherService: appLauncherService
+                appLauncherService: appLauncherService,
+                clipboardService: clipboardService
             )
         )
 
         let window = NSWindow(contentViewController: hosting)
         window.title = "DynamicMac Settings"
-        window.styleMask = [.titled, .closable, .miniaturizable]
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.isReleasedWhenClosed = false
         window.center()
         window.setFrameAutosaveName("DynamicMacSettingsWindow")
         self.window = window
 
+        if let existing = willCloseObserver {
+            NotificationCenter.default.removeObserver(existing)
+        }
         willCloseObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification,
             object: window,

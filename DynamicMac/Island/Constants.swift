@@ -14,13 +14,23 @@ enum Constants {
     enum Island {
         /// Target width for expanded-state content. DynamicNotchKit's panel
         /// sizes itself around the SwiftUI view, so this drives the SwiftUI frame.
-        static let expandedContentWidth: CGFloat = 360
+        /// DNK adds 15pt safe-area insets on each side, so the total island
+        /// width is roughly this + 30pt + DNK corner radii.
+        static let expandedContentWidth: CGFloat = 340
 
-        /// Vertical padding around expanded content.
-        static let expandedVerticalPadding: CGFloat = 12
+        /// Vertical padding around expanded content. Kept tight since DNK
+        /// already adds a 15pt bottom safe-area inset.
+        static let expandedVerticalPadding: CGFloat = 8
 
-        /// Horizontal padding around expanded content.
-        static let expandedHorizontalPadding: CGFloat = 20
+        /// Horizontal padding around expanded content. Kept tight since DNK
+        /// already adds 15pt side safe-area insets.
+        static let expandedHorizontalPadding: CGFloat = 14
+
+        /// Width of the AI Quick Ask response panel.
+        static let quickAskResponseWidth: CGFloat = 420
+
+        /// Maximum height for the AI response panel before it scrolls.
+        static let quickAskResponseMaxHeight: CGFloat = 300
     }
 
     enum Animation {

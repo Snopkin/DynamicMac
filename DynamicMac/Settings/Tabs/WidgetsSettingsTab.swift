@@ -68,6 +68,8 @@ private struct WidgetRow: View {
         case .nowPlaying: return "music.note"
         case .pomodoro: return "leaf.fill"
         case .appLauncher: return "square.grid.2x2"
+        case .clipboard: return "doc.on.clipboard"
+        case .quickAsk: return "sparkles"
         }
     }
 }

@@ -23,10 +23,13 @@ struct MediaSettingsTab: View {
         Form {
             Section {
                 Toggle("Enable Now Playing widget", isOn: $settings.mediaNowPlayingEnabled)
+
+                Toggle("Auto-switch when playing", isOn: $settings.mediaAutoSwitchOnPlay)
+                    .disabled(!settings.mediaNowPlayingEnabled)
             } header: {
                 Text("Now Playing")
             } footer: {
-                Text("Shows system-wide playback from Music, Spotify, Safari/Chrome, Podcasts, and other media apps. Turning this off hides the widget entirely, even when something is playing.")
+                Text("Shows system-wide playback from Music, Spotify, Safari/Chrome, Podcasts, and other media apps. Auto-switch jumps to Now Playing whenever playback starts.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

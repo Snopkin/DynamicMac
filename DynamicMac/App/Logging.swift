@@ -26,4 +26,5 @@ enum DMLog {
     static let island = Logger(subsystem: subsystem, category: "island")
     static let hover = Logger(subsystem: subsystem, category: "hover")
     static let persistence = Logger(subsystem: subsystem, category: "persistence")
+    static let ai = Logger(subsystem: subsystem, category: "ai")
 }
