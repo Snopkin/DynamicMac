@@ -83,17 +83,19 @@ struct IslandRouterView: View {
         .onChange(of: currentPomodoro == nil) { _, _ in
             biasSelectionTowardLiveContent()
         }
-        // Auto-switch to Now Playing when playback starts (if enabled).
-        .onChange(of: mediaService.current != nil) { wasPlaying, isPlaying in
-            if isPlaying, !wasPlaying, appSettings.mediaAutoSwitchOnPlay {
+        // Auto-switch to Now Playing when playback actually starts (if
+        // enabled). Watches `isPlaying` rather than `current != nil` so
+        // stale paused media from browser tabs does not trigger a switch.
+        .onChange(of: mediaService.current?.isPlaying) { wasPlaying, isPlaying in
+            if isPlaying == true, wasPlaying != true, appSettings.mediaAutoSwitchOnPlay {
                 switchToNowPlaying()
             }
         }
-        // On first appearance, if media is already playing and auto-switch
+        // On first appearance, if media is actively playing and auto-switch
         // is on, jump to Now Playing. The onChange above only fires on
         // transitions, so it misses the "already playing on launch" case.
         .onAppear {
-            if mediaService.current != nil, appSettings.mediaAutoSwitchOnPlay {
+            if mediaService.current?.isPlaying == true, appSettings.mediaAutoSwitchOnPlay {
                 switchToNowPlaying()
             }
         }
@@ -285,7 +287,7 @@ struct IslandRouterView: View {
         case .timer:
             return timerService.current != nil
         case .nowPlaying:
-            return mediaService.current != nil
+            return mediaService.isRecentlyActive
         case .pomodoro:
             return pomodoroService.current != nil
         case .appLauncher:

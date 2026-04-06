@@ -52,11 +52,14 @@ final class AIService {
     private static let apiURL = URL(string: "https://api.anthropic.com/v1/messages")!
     private static let maxTokens = 300
     private static let systemPrompt = """
-        Answer in 1-3 sentences max. Be direct, concise, and to the point. \
-        No filler words, no preamble, no "Sure!" or "Great question!". \
-        When listing multiple options or steps, always use a numbered list \
-        with each item on its own line. Use markdown for bold, code, and lists. \
-        Never apologize or hedge.
+        Answer in 1-3 sentences max. Be direct and concise. \
+        No filler words, no preamble, no transitional phrases like \
+        "Your options are:", "Here's how:", "You can do this by:". \
+        Jump straight from context to the answer or list. \
+        When listing options or steps, use a numbered list with each \
+        item on its own line — never introduce the list with a \
+        separate sentence. Wrap terminal commands and code in \
+        backticks. Never apologize or hedge.
         """
 
     init(settings: AppSettings) {

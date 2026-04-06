@@ -29,6 +29,21 @@ final class MediaService {
     /// this instead of decoding on the view thread.
     private(set) var artworkImage: NSImage?
 
+    /// Wall-clock timestamp of the last update where `isPlaying` was
+    /// `true`. Used to distinguish actively-playing media from stale
+    /// paused sessions (e.g. a browser tab with a video open).
+    private(set) var lastPlayingDate: Date?
+
+    /// Whether the media session is actively playing or was paused very
+    /// recently (within 30 seconds). Stale paused media from browser tabs
+    /// or long-ago sessions returns `false`.
+    var isRecentlyActive: Bool {
+        guard let info = current else { return false }
+        if info.isPlaying { return true }
+        guard let lastPlaying = lastPlayingDate else { return false }
+        return Date().timeIntervalSince(lastPlaying) < 30
+    }
+
     /// Set by `NotchIslandController` so route changes (idle → playing)
     /// can programmatically expand the notch.
     var onPlaybackStateBecameActive: (() -> Void)?
@@ -69,6 +84,10 @@ final class MediaService {
             artworkImage = nil
             artworkCache = nil
             return
+        }
+
+        if info.isPlaying {
+            lastPlayingDate = Date()
         }
 
         refreshArtwork(for: info)

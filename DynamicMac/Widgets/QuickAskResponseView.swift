@@ -164,41 +164,18 @@ struct QuickAskResponseView: View {
         .padding(.vertical, 5)
     }
 
-    /// Render response text with inline markdown (bold, code) while
-    /// preserving line breaks. Standard markdown parsing collapses `\n`
-    /// into spaces, which squishes list items together. Using
-    /// `.inlineOnlyPreservingWhitespace` keeps newlines intact.
+    /// Render response text with inline markdown while preserving line
+    /// breaks. Code spans (backtick-wrapped) are rendered as styled
+    /// inline chips with a small copy button next to them.
     private func markdownText(_ text: String, isStreaming: Bool) -> some View {
         let displayText = isStreaming ? text + "▍" : text
-        let options = AttributedString.MarkdownParsingOptions(
-            interpretedSyntax: .inlineOnlyPreservingWhitespace
-        )
+        let segments = ResponseTextParser.parse(displayText)
 
-        return Group {
-            if isStreaming {
-                if let attributed = try? AttributedString(markdown: displayText, options: options) {
-                    Text(attributed)
-                        .font(.system(size: 13))
-                        .foregroundStyle(.white.opacity(0.9))
-                } else {
-                    Text(displayText)
-                        .font(.system(size: 13))
-                        .foregroundStyle(.white.opacity(0.9))
-                }
-            } else {
-                if let attributed = try? AttributedString(markdown: displayText, options: options) {
-                    Text(attributed)
-                        .font(.system(size: 13))
-                        .foregroundStyle(.white.opacity(0.9))
-                        .textSelection(.enabled)
-                } else {
-                    Text(displayText)
-                        .font(.system(size: 13))
-                        .foregroundStyle(.white.opacity(0.9))
-                        .textSelection(.enabled)
-                }
-            }
-        }
+        return ResponseSegmentsView(
+            segments: segments,
+            isStreaming: isStreaming,
+            onCopy: onCopy
+        )
         .fixedSize(horizontal: false, vertical: true)
     }
 

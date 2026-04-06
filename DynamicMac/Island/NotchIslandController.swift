@@ -179,6 +179,13 @@ final class NotchIslandController {
         detector.start()
         self.hoverDetector = detector
 
+        // Let the response panel's cursor tracker know about the island's
+        // interaction rect so hovering the notch area also resets the
+        // auto-dismiss countdown.
+        quickAskPanelController.islandInteractionRect = { [weak self] in
+            self?.expandedInteractionRect
+        }
+
         installScrollMonitor()
 
         timerService.onTimerFinished = { [weak self] in

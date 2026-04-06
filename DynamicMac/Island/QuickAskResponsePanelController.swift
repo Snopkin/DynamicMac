@@ -51,6 +51,11 @@ final class QuickAskResponsePanelController {
     /// (IslandRouterView) so it can also clear AIService state.
     var onAutoDismiss: (() -> Void)?
 
+    /// Returns the island's expanded interaction rect so the cursor
+    /// tracker can treat the notch area as "inside". Set by
+    /// `NotchIslandController` after construction.
+    var islandInteractionRect: (() -> NSRect?)?
+
     // MARK: - Show / Update / Dismiss
 
     /// Show the response panel below the island with the given SwiftUI
@@ -183,17 +188,19 @@ final class QuickAskResponsePanelController {
         }
 
         let cursor = NSEvent.mouseLocation
-        // Use a slightly inflated frame for comfort.
-        let hitRect = panel.frame.insetBy(dx: -10, dy: -10)
-        let cursorInside = hitRect.contains(cursor)
+
+        // Check if cursor is inside the response panel (with comfort margin)
+        // OR inside the island's expanded interaction rect (notch + content).
+        let panelHitRect = panel.frame.insetBy(dx: -10, dy: -10)
+        let insidePanel = panelHitRect.contains(cursor)
+        let insideIsland = islandInteractionRect?()?.contains(cursor) ?? false
+        let cursorInside = insidePanel || insideIsland
 
         if cursorInside {
-            // Cursor returned — reset the countdown.
             if countdownStart != nil {
                 resetCountdown()
             }
         } else {
-            // Cursor outside — start or continue countdown.
             if countdownStart == nil {
                 startCountdown()
             }
