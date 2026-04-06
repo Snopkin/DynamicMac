@@ -14,6 +14,10 @@ struct NowPlayingWidgetView: View {
 
     @Bindable var service: MediaService
 
+    /// Resolved transition animation passed in from `IslandRouterView`,
+    /// already folding Reduce Motion + Low Power Mode into the decision.
+    let animation: SwiftUI.Animation
+
     var body: some View {
         HStack(spacing: 14) {
             artwork
@@ -31,17 +35,22 @@ struct NowPlayingWidgetView: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(accessibleTrackDescription)
 
             Spacer(minLength: 0)
 
             HStack(spacing: 8) {
-                iconButton(systemName: "backward.fill") {
+                iconButton(systemName: "backward.fill", accessibilityLabel: "Previous track") {
                     service.previousTrack()
                 }
-                iconButton(systemName: playPauseSystemName) {
+                iconButton(
+                    systemName: playPauseSystemName,
+                    accessibilityLabel: (service.current?.isPlaying ?? false) ? "Pause" : "Play"
+                ) {
                     service.togglePlayPause()
                 }
-                iconButton(systemName: "forward.fill") {
+                iconButton(systemName: "forward.fill", accessibilityLabel: "Next track") {
                     service.nextTrack()
                 }
             }
@@ -49,7 +58,7 @@ struct NowPlayingWidgetView: View {
         .padding(.vertical, Constants.Island.expandedVerticalPadding)
         .padding(.horizontal, Constants.Island.expandedHorizontalPadding)
         .frame(width: Constants.Island.expandedContentWidth)
-        .animation(Constants.Animation.spring, value: service.current?.trackKey)
+        .animation(animation, value: service.current?.trackKey)
     }
 
     // MARK: - Artwork
@@ -72,6 +81,7 @@ struct NowPlayingWidgetView: View {
         }
         .frame(width: 44, height: 44)
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .accessibilityHidden(true)
     }
 
     // MARK: - Buttons
@@ -80,7 +90,11 @@ struct NowPlayingWidgetView: View {
         (service.current?.isPlaying ?? false) ? "pause.fill" : "play.fill"
     }
 
-    private func iconButton(systemName: String, action: @escaping () -> Void) -> some View {
+    private func iconButton(
+        systemName: String,
+        accessibilityLabel: String,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 13, weight: .semibold))
@@ -89,5 +103,18 @@ struct NowPlayingWidgetView: View {
                 .background(Circle().fill(.white.opacity(0.12)))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    // MARK: - Accessibility helpers
+
+    private var accessibleTrackDescription: String {
+        guard let info = service.current, let title = info.title else {
+            return "Nothing playing"
+        }
+        if let artist = info.artist, !artist.isEmpty {
+            return "\(title) by \(artist)"
+        }
+        return title
     }
 }

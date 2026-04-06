@@ -33,8 +33,21 @@ enum Constants {
             blendDuration: 0
         )
 
-        /// Fallback curve used when the user has enabled Reduce Motion.
+        /// Fallback curve used when the user has enabled Reduce Motion
+        /// or is in Low Power Mode.
         static let reducedMotion: SwiftUI.Animation = .easeInOut(duration: 0.15)
+
+        /// Picks the spring or the reduced-motion curve based on whether
+        /// accessibility or battery-saver preferences are asking for less
+        /// motion. Widgets read both flags from SwiftUI environment /
+        /// observed `PowerMonitor` and pass them through here so the
+        /// decision lives in one place.
+        static func islandAnimation(
+            reduceMotion: Bool,
+            lowPower: Bool
+        ) -> SwiftUI.Animation {
+            (reduceMotion || lowPower) ? reducedMotion : spring
+        }
     }
 
     enum HoverDetector {

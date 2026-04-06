@@ -6,6 +6,7 @@
 //
 
 import AppKit
+import os
 
 /// Detects when the cursor enters and leaves the notch region.
 ///
@@ -65,6 +66,8 @@ final class NotchHoverDetector {
 
         let screen = NSScreen.primaryWithNotchOrMain
         let frame = screen.dmHoverRect
+
+        DMLog.hover.debug("install panel frame=\(NSStringFromRect(frame), privacy: .public) screen=\(screen.localizedName, privacy: .public)")
 
         let panel = HoverDetectorPanel(
             contentRect: frame,
@@ -142,10 +145,14 @@ private final class HoverTrackingView: NSView {
     }
 
     override func mouseEntered(with event: NSEvent) {
+        let location = NSEvent.mouseLocation
+        DMLog.hover.debug("mouseEntered at \(NSStringFromPoint(location), privacy: .public)")
         onEnter()
     }
 
     override func mouseExited(with event: NSEvent) {
+        let location = NSEvent.mouseLocation
+        DMLog.hover.debug("mouseExited at \(NSStringFromPoint(location), privacy: .public)")
         onExit()
     }
 }

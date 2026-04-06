@@ -30,6 +30,9 @@ struct NowPlayingInfo: Equatable {
     }
 
     var bundleIdentifier: String?
+
+    /// Reserved for future source-attribution UI (e.g. showing which app
+    /// is hosting the media session). The adapter already emits this key.
     var parentApplicationBundleIdentifier: String?
 
     var title: String?

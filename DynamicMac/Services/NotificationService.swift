@@ -20,6 +20,7 @@ final class NotificationService {
 
     private enum RequestIdentifier {
         static let timerCompletion = "com.lidor.DynamicMac.timer.completion"
+        static let pomodoroCompletion = "com.lidor.DynamicMac.pomodoro.completion"
     }
 
     /// Request notification authorization if we have not asked before.
@@ -74,5 +75,62 @@ final class NotificationService {
         center.removePendingNotificationRequests(
             withIdentifiers: [RequestIdentifier.timerCompletion]
         )
+    }
+
+    // MARK: - Pomodoro
+
+    /// Schedule a local notification to fire when the current pomodoro
+    /// phase completes. Only the current phase is scheduled — subsequent
+    /// phases in an auto-advancing cycle are notified on-the-fly by
+    /// `PomodoroService` while the app is running. See the Pomodoro
+    /// Settings tab footer for the quit-while-running caveat.
+    ///
+    /// - Parameters:
+    ///   - phase: the phase that just ended (used to craft the body text
+    ///     that names the *upcoming* phase to transition into).
+    ///   - seconds: wall-clock seconds from now until the phase completes.
+    func schedulePomodoroPhaseCompletion(
+        phase: PomodoroPhase,
+        afterSeconds seconds: TimeInterval
+    ) {
+        cancelPomodoroPhaseCompletion()
+
+        guard seconds > 0 else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = "Pomodoro"
+        content.body = body(forCompletionOf: phase)
+        content.sound = .default
+        content.interruptionLevel = .active
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: seconds, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: RequestIdentifier.pomodoroCompletion,
+            content: content,
+            trigger: trigger
+        )
+
+        center.add(request) { _ in
+            // Non-fatal: the in-app auto-expand on phase transition still
+            // fires from PomodoroService.
+        }
+    }
+
+    /// Cancel the scheduled pomodoro phase-completion notification.
+    func cancelPomodoroPhaseCompletion() {
+        center.removePendingNotificationRequests(
+            withIdentifiers: [RequestIdentifier.pomodoroCompletion]
+        )
+    }
+
+    /// Human-readable body text announcing the transition out of the
+    /// given phase. The notification fires exactly at the moment the
+    /// phase completes, so the wording points at what's next.
+    private func body(forCompletionOf phase: PomodoroPhase) -> String {
+        switch phase {
+        case .focus: return "Focus block done. Time for a break."
+        case .shortBreak: return "Break over. Back to focus."
+        case .longBreak: return "Long break done. Back to focus."
+        }
     }
 }

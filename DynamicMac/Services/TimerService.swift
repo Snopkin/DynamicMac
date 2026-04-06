@@ -25,6 +25,29 @@ final class TimerService {
     /// should offer preset durations.
     private(set) var current: TimerModel?
 
+    /// Wall-clock timestamp of the most recent user-initiated session
+    /// start. Used by `IslandRouterView` as a tiebreaker: when two
+    /// widgets both have live content (e.g. a long pomodoro still
+    /// running in round 4 of 4 while the user also just started an
+    /// ad-hoc timer), the one the user activated most recently wins
+    /// the initial selection on the next island open. Never cleared —
+    /// cancelling a timer leaves the stale timestamp alone so a later
+    /// cancel-only interaction does not accidentally demote the
+    /// pomodoro below the no-longer-active timer.
+    private(set) var lastActivationDate: Date?
+
+    /// Monotonic counter bumped once per display tick. Exists purely as
+    /// an observation hook for SwiftUI: `TimerModel` is a `Equatable`
+    /// struct whose stored fields do not change between ticks (only the
+    /// computed `remaining` does, reading `Date.now`), so assigning
+    /// `current = timer` is a no-op from `@Observable`'s point of view
+    /// and never invalidates views. Reading this counter inside a view
+    /// body establishes a dependency on something that *actually* moves
+    /// every second, forcing the body to re-evaluate and recompute
+    /// `timer.remaining` fresh from the wall clock. The value itself is
+    /// meaningless — only the fact that it changes matters.
+    private(set) var displayTickCounter: UInt64 = 0
+
     /// Set by `NotchIslandController` during wiring. Invoked when a
     /// running timer transitions to `.finished` so the notch can
     /// programmatically expand and draw attention.
@@ -85,17 +108,19 @@ final class TimerService {
             state: .running(endDate: endDate)
         )
         current = timer
+        lastActivationDate = Date.now
         persistence.save(timer)
 
-        Task {
-            let granted = await notifications.requestAuthorizationIfNeeded()
-            if granted {
-                notifications.scheduleTimerCompletion(label: label, afterSeconds: duration)
-            }
-        }
-
+        // Schedule before starting the tick so a very short timer
+        // cannot complete before the notification is queued.
+        notifications.scheduleTimerCompletion(label: label, afterSeconds: duration)
         startDisplayTick()
         playStartHaptic()
+
+        Task { [notifications] in
+            let granted = await notifications.requestAuthorizationIfNeeded()
+            if !granted { notifications.cancelTimerCompletion() }
+        }
     }
 
     func pause() {
@@ -113,16 +138,16 @@ final class TimerService {
         let endDate = Date.now.addingTimeInterval(remaining)
         timer.state = .running(endDate: endDate)
         current = timer
+        lastActivationDate = Date.now
         persistence.save(timer)
 
-        Task {
-            let granted = await notifications.requestAuthorizationIfNeeded()
-            if granted {
-                notifications.scheduleTimerCompletion(label: timer.label, afterSeconds: remaining)
-            }
-        }
-
+        notifications.scheduleTimerCompletion(label: timer.label, afterSeconds: remaining)
         startDisplayTick()
+
+        Task { [notifications] in
+            let granted = await notifications.requestAuthorizationIfNeeded()
+            if !granted { notifications.cancelTimerCompletion() }
+        }
     }
 
     func cancel() {
@@ -167,8 +192,13 @@ final class TimerService {
             return
         }
 
-        // Forces observers to re-evaluate `current.remaining`.
-        current = timer
+        // Bump the counter so any view that reads it in its body
+        // re-evaluates against the fresh `Date.now` on the next runloop
+        // cycle. Reassigning `current = timer` here would be a no-op
+        // because `TimerModel` is `Equatable` and nothing stored on the
+        // struct has actually changed — only `remaining`, which is
+        // computed.
+        displayTickCounter &+= 1
 
         if timer.hasElapsed {
             timer.state = .finished

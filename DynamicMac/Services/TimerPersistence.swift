@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import os
 
 /// Stores the currently active `TimerModel` (if any) in `UserDefaults`
 /// as JSON. One optional timer at a time — MVP scope.
@@ -33,7 +34,12 @@ struct TimerPersistence {
         guard let data = defaults.data(forKey: Key.currentTimer) else {
             return nil
         }
-        return try? decoder.decode(TimerModel.self, from: data)
+        do {
+            return try decoder.decode(TimerModel.self, from: data)
+        } catch {
+            DMLog.persistence.error("TimerModel decode failed: \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
     }
 
     func save(_ timer: TimerModel?) {
@@ -41,9 +47,11 @@ struct TimerPersistence {
             defaults.removeObject(forKey: Key.currentTimer)
             return
         }
-        guard let data = try? encoder.encode(timer) else {
-            return
+        do {
+            let data = try encoder.encode(timer)
+            defaults.set(data, forKey: Key.currentTimer)
+        } catch {
+            DMLog.persistence.error("TimerModel encode failed: \(error.localizedDescription, privacy: .public)")
         }
-        defaults.set(data, forKey: Key.currentTimer)
     }
 }

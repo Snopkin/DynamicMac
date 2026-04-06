@@ -15,8 +15,23 @@ struct TimerWidgetView: View {
 
     @Bindable var service: TimerService
 
+    /// Resolved transition animation passed in from `IslandRouterView`,
+    /// already folding Reduce Motion + Low Power Mode into the decision.
+    let animation: SwiftUI.Animation
+
     var body: some View {
-        Group {
+        // Touch the tick counter so SwiftUI's @Observable tracking
+        // registers a dependency on it and re-runs this body every
+        // second while a timer is running. Without this read, the body
+        // only observes `service.current`, which is an `Equatable`
+        // struct whose stored fields never change while the countdown
+        // runs (only the computed `remaining` does) — so the tick
+        // assignment inside the service is a no-op from SwiftUI's
+        // perspective and the label freezes at the moment the island
+        // opened. The value of the counter itself is unused.
+        _ = service.displayTickCounter
+
+        return Group {
             if let timer = service.current {
                 switch timer.state {
                 case .finished:
@@ -31,7 +46,7 @@ struct TimerWidgetView: View {
         .padding(.vertical, Constants.Island.expandedVerticalPadding)
         .padding(.horizontal, Constants.Island.expandedHorizontalPadding)
         .frame(width: Constants.Island.expandedContentWidth)
-        .animation(Constants.Animation.spring, value: service.current)
+        .animation(animation, value: service.current)
     }
 
     // MARK: - Idle
@@ -41,6 +56,7 @@ struct TimerWidgetView: View {
             Image(systemName: "timer")
                 .font(.title3)
                 .foregroundStyle(.white.opacity(0.9))
+                .accessibilityHidden(true)
 
             ForEach(Constants.Timers.presetMinutes, id: \.self) { minutes in
                 Button {
@@ -59,10 +75,13 @@ struct TimerWidgetView: View {
                         )
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Start \(minutes) minute timer")
             }
 
             Spacer(minLength: 0)
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Timer presets")
     }
 
     // MARK: - Running / paused
@@ -71,6 +90,7 @@ struct TimerWidgetView: View {
         HStack(spacing: 14) {
             ProgressRing(fraction: timer.progressFraction)
                 .frame(width: 44, height: 44)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(formatTimeRemaining(timer.remaining))
@@ -82,12 +102,14 @@ struct TimerWidgetView: View {
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.7))
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(timer.label), \(formatTimeRemaining(timer.remaining)) remaining")
 
             Spacer(minLength: 0)
 
             HStack(spacing: 8) {
                 pauseOrResumeButton(timer: timer)
-                iconButton(systemName: "xmark") {
+                iconButton(systemName: "xmark", accessibilityLabel: "Cancel timer") {
                     service.cancel()
                 }
             }
@@ -98,11 +120,11 @@ struct TimerWidgetView: View {
     private func pauseOrResumeButton(timer: TimerModel) -> some View {
         switch timer.state {
         case .running:
-            iconButton(systemName: "pause.fill") {
+            iconButton(systemName: "pause.fill", accessibilityLabel: "Pause timer") {
                 service.pause()
             }
         case .paused:
-            iconButton(systemName: "play.fill") {
+            iconButton(systemName: "play.fill", accessibilityLabel: "Resume timer") {
                 service.resume()
             }
         case .finished:
@@ -118,6 +140,7 @@ struct TimerWidgetView: View {
                 .font(.title)
                 .foregroundStyle(.green)
                 .symbolRenderingMode(.hierarchical)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("Timer complete")
@@ -127,10 +150,12 @@ struct TimerWidgetView: View {
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.7))
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Timer complete: \(timer.label)")
 
             Spacer(minLength: 0)
 
-            iconButton(systemName: "checkmark") {
+            iconButton(systemName: "checkmark", accessibilityLabel: "Dismiss completed timer") {
                 service.dismissFinished()
             }
         }
@@ -138,7 +163,11 @@ struct TimerWidgetView: View {
 
     // MARK: - Reusable bits
 
-    private func iconButton(systemName: String, action: @escaping () -> Void) -> some View {
+    private func iconButton(
+        systemName: String,
+        accessibilityLabel: String,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 13, weight: .semibold))
@@ -147,6 +176,7 @@ struct TimerWidgetView: View {
                 .background(Circle().fill(.white.opacity(0.12)))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
     }
 
     private func formatTimeRemaining(_ seconds: TimeInterval) -> String {

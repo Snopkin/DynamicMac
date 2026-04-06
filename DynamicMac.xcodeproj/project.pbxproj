@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		CDDNKPKG0000000000000001 /* DynamicNotchKit in Frameworks */ = {isa = PBXBuildFile; productRef = CDDNKPKG0000000000000003 /* DynamicNotchKit */; };
 		CDMRA00000000000000000002 /* MediaRemoteAdapter.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = CDMRA00000000000000000001 /* MediaRemoteAdapter.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		CDSPKPKG0000000000000001 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = CDSPKPKG0000000000000003 /* Sparkle */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -28,11 +29,25 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		CDMRA00000000000000000003 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				CDMRA00000000000000000002 /* MediaRemoteAdapter.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		CD4EC83F2F8299810002A7F1 /* DynamicMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DynamicMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CD4EC84E2F8299830002A7F1 /* DynamicMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DynamicMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CD4EC8582F8299830002A7F1 /* DynamicMacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DynamicMacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		CDMRA00000000000000000001 /* MediaRemoteAdapter.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MediaRemoteAdapter.framework; path = External/mediaremote-adapter/MediaRemoteAdapter.framework; sourceTree = "<group>"; };
+		CDMRA00000000000000000001 /* MediaRemoteAdapter.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MediaRemoteAdapter.framework; path = "External/mediaremote-adapter/MediaRemoteAdapter.framework"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -53,26 +68,13 @@
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
-/* Begin PBXCopyFilesBuildPhase section */
-		CDMRA00000000000000000003 /* Embed Frameworks */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 10;
-			files = (
-				CDMRA00000000000000000002 /* MediaRemoteAdapter.framework in Embed Frameworks */,
-			);
-			name = "Embed Frameworks";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXCopyFilesBuildPhase section */
-
 /* Begin PBXFrameworksBuildPhase section */
 		CD4EC83C2F8299810002A7F1 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				CDDNKPKG0000000000000001 /* DynamicNotchKit in Frameworks */,
+				CDSPKPKG0000000000000001 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -136,6 +138,7 @@
 			name = DynamicMac;
 			packageProductDependencies = (
 				CDDNKPKG0000000000000003 /* DynamicNotchKit */,
+				CDSPKPKG0000000000000003 /* Sparkle */,
 			);
 			productName = DynamicMac;
 			productReference = CD4EC83F2F8299810002A7F1 /* DynamicMac.app */;
@@ -221,6 +224,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				CDDNKPKG0000000000000002 /* XCRemoteSwiftPackageReference "DynamicNotchKit" */,
+				CDSPKPKG0000000000000002 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = CD4EC8402F8299810002A7F1 /* Products */;
@@ -438,6 +442,9 @@
 				INFOPLIST_KEY_CFBundleDisplayName = DynamicMac;
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Lidor Nir Shalom";
+				INFOPLIST_KEY_SUEnableAutomaticChecks = NO;
+				INFOPLIST_KEY_SUFeedURL = "https://example.com/dynamicmac/appcast.xml";
+				INFOPLIST_KEY_SUPublicEDKey = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -477,6 +484,9 @@
 				INFOPLIST_KEY_CFBundleDisplayName = DynamicMac;
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Lidor Nir Shalom";
+				INFOPLIST_KEY_SUEnableAutomaticChecks = NO;
+				INFOPLIST_KEY_SUFeedURL = "https://example.com/dynamicmac/appcast.xml";
+				INFOPLIST_KEY_SUPublicEDKey = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -624,6 +634,14 @@
 				version = 1.0.0;
 			};
 		};
+		CDSPKPKG0000000000000002 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.6.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -631,6 +649,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = CDDNKPKG0000000000000002 /* XCRemoteSwiftPackageReference "DynamicNotchKit" */;
 			productName = DynamicNotchKit;
+		};
+		CDSPKPKG0000000000000003 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CDSPKPKG0000000000000002 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

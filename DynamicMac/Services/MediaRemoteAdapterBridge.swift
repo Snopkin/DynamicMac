@@ -39,6 +39,8 @@ final class MediaRemoteAdapterBridge: MediaSource {
     private let frameworkURL: URL
 
     private var streamProcess: Process?
+    private var stdoutPipe: Pipe?
+    private var stderrPipe: Pipe?
     private var stdoutBuffer = Data()
 
     /// Running merged state. Mirrors whatever the adapter last told us
@@ -76,9 +78,13 @@ final class MediaRemoteAdapterBridge: MediaSource {
     }
 
     func stop() {
+        stdoutPipe?.fileHandleForReading.readabilityHandler = nil
+        stderrPipe?.fileHandleForReading.readabilityHandler = nil
         streamProcess?.terminationHandler = nil
         streamProcess?.terminate()
         streamProcess = nil
+        stdoutPipe = nil
+        stderrPipe = nil
         stdoutBuffer.removeAll(keepingCapacity: false)
     }
 
@@ -139,13 +145,21 @@ final class MediaRemoteAdapterBridge: MediaSource {
         do {
             try process.run()
             streamProcess = process
+            self.stdoutPipe = stdoutPipe
+            self.stderrPipe = stderrPipe
         } catch {
             streamProcess = nil
+            self.stdoutPipe = nil
+            self.stderrPipe = nil
         }
     }
 
     private func handleStreamTermination() {
+        stdoutPipe?.fileHandleForReading.readabilityHandler = nil
+        stderrPipe?.fileHandleForReading.readabilityHandler = nil
         streamProcess = nil
+        stdoutPipe = nil
+        stderrPipe = nil
         stdoutBuffer.removeAll(keepingCapacity: false)
         currentPayload.removeAll()
         onUpdate?(nil)

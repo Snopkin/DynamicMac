@@ -1,0 +1,93 @@
+DynamicMac
+Copyright © 2026 Lidor Nir Shalom. All rights reserved.
+
+
+1. Ownership
+
+DynamicMac (the "Software"), including its source code, compiled binaries,
+assets, documentation, and any associated materials, is the exclusive
+property of Lidor Nir Shalom (the "Author"). All rights not expressly
+granted below are reserved.
+
+
+2. Grant of use (binary)
+
+The Author grants any individual a personal, non-exclusive, non-transferable,
+revocable license to download, install, and run official binary releases of
+the Software on their own personal computers, free of charge, for personal,
+non-commercial use.
+
+"Official binary release" means a build of the Software signed and
+distributed by the Author (e.g. via the project's GitHub releases page or
+an Author-operated Sparkle update feed).
+
+
+3. Restrictions
+
+Without the Author's prior written permission, you may not:
+
+  (a) copy, modify, adapt, translate, create derivative works of, or
+      reverse-engineer the Software, except to the minimum extent
+      permitted by non-waivable applicable law;
+
+  (b) redistribute, sell, sublicense, rent, lease, or otherwise make
+      the Software available to any third party, whether in source or
+      binary form, whether for a fee or free of charge;
+
+  (c) remove or alter any copyright, trademark, or other proprietary
+      notices from the Software;
+
+  (d) use the Software, or any portion of it, as a component of a
+      commercial product or service;
+
+  (e) use the Software's name, logo, or the Author's name to endorse or
+      promote any other product without prior written permission.
+
+
+4. Source code
+
+The source code of the Software is not open source. Access to the source
+repository, if any, does not grant any license beyond what is stated in
+this document. In particular, cloning or viewing the source code does not
+grant the right to modify, redistribute, or create derivative works.
+
+
+5. Third-party components
+
+The Software incorporates or depends on third-party open-source components,
+each governed by its own license. Notices and license texts for those
+components are included with the Software (see the "About" tab in Settings
+and the README). Nothing in this license overrides, restricts, or modifies
+the terms of those third-party licenses as they apply to those third-party
+components. Third-party component licenses at the time of writing:
+
+  - DynamicNotchKit — MIT License
+      https://github.com/MrKai77/DynamicNotchKit
+  - mediaremote-adapter — BSD 3-Clause License
+      https://github.com/ungive/mediaremote-adapter
+  - Sparkle — MIT License
+      https://github.com/sparkle-project/Sparkle
+
+
+6. No warranty
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. IN NO EVENT SHALL
+THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+7. Changes to these terms
+
+The Author reserves the right to change the license terms for future
+versions of the Software. Your right to use a specific binary release is
+governed by the license in effect for that release.
+
+
+8. Contact
+
+For permission requests outside the scope of this license, contact the
+Author through the project's GitHub repository.

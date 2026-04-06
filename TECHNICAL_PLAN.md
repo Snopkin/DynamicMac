@@ -11,9 +11,9 @@ Plan compiled 2026-04-05. Consumes two research briefs:
 | Phase 0 — Reset template and hygiene | Done | `82675ee` |
 | Phase 1 — MVP overlay + hover + spring expand | Done | `4278a6a` |
 | Phase 2 — Timers widget | Done | `fa38515` |
-| Phase 3 — Now Playing widget | Not started | — |
-| Phase 4 — Settings and polish | Not started | — |
-| Phase 5 — Polish, performance, and ship | Not started | — |
+| Phase 3 — Now Playing widget | Done | `4c54bcd` |
+| Phase 4 — Settings and polish | Done | uncommitted |
+| Phase 5 — Polish, performance, and ship | Part A + B done (code-side); manual notarization / Instruments / VoiceOver owned by user | uncommitted |
 
 ### Phase 1 architectural simplification
 
@@ -437,6 +437,41 @@ Test targets: `DynamicMacTests/` and `DynamicMacUITests/` stay in place, replace
 
 ### Phase 5 — Polish, performance, and ship
 
+**Status**: Part A (code review, accessibility, Reduce Motion, Low Power Mode) **Done** (uncommitted). Part B (LICENSE, app icon, Sparkle, README) **Done** (uncommitted). Remaining: manual notarization + Gatekeeper smoke, Instruments profiling, VoiceOver end-to-end — all owned by the user on their machine.
+
+**Part A — what shipped**:
+- Walked every Swift file. Two files were over the 250-line soft cap:
+  - `AppSettings.swift` (303 → 188) split into `AppSettings.swift` + `AppSettings+Storage.swift` (Keys, Defaults, widget decoders, hex codec) + `LaunchAtLoginController.swift` (protocol + `SystemLaunchAtLoginController`).
+  - `NotchIslandController.swift` (287 → 248) split into `NotchIslandController.swift` + `NotchIslandController+Chain.swift` (`requestExpand`/`requestHide`/`enqueueNotchOperation`).
+- Audited every closure for `[weak self]`. All event/timer/process callbacks already captured weakly — no retain cycles found.
+- Accessibility labels added to every icon button in `TimerWidgetView`, `NowPlayingWidgetView`, and a combined label on `HelloWorldWidgetView`. VoiceOver now announces "Start 5 minute timer", "Pause timer", "Cancel timer", "Previous track", "Play / Pause", "Next track", and full `"{title} by {artist}"` for the current track.
+- Dynamic Type clamped to `.medium ... .xxLarge` at the router (`IslandRouterView`) so every widget inherits the limit. The island has a fixed content width and cannot resize, so uncapped accessibility sizes would clip the transport row.
+- Reduce Motion + Low Power Mode now share one resolver: `Constants.Animation.islandAnimation(reduceMotion:lowPower:)` picks `spring` vs `reducedMotion`. `IslandRouterView` reads `@Environment(\.accessibilityReduceMotion)` and observes a new `PowerMonitor` service, passing the resolved animation into `TimerWidgetView` and `NowPlayingWidgetView` as a `let animation: SwiftUI.Animation`.
+- New `PowerMonitor` service (`DynamicMac/Services/PowerMonitor.swift`) observes `.NSProcessInfoPowerStateDidChange`, exposes `isLowPowerModeActive` as an `@Observable` flag, and is owned by `AppDelegate`. Torn down via explicit `stop()` from `applicationWillTerminate` (Swift 6 strict concurrency forbids nonisolated deinit touching MainActor state).
+- `AppDelegate` now owns `powerMonitor` and injects it through `NotchIslandController` → `IslandRouterView`.
+- Clean build: `xcodebuild build` succeeds, zero warnings under Swift 6 strict concurrency.
+
+**Part B — what shipped**:
+- **Project license**: `LICENSE` at repo root. Proprietary "all rights reserved" with a personal, non-commercial, free-binary grant for official releases. User confirmed "not open source but the program will be free for now", so MIT/Apache/BSD are off the table (they explicitly permit redistribution / forking). Third-party component notices for DynamicNotchKit (MIT), mediaremote-adapter (BSD-3), and Sparkle (MIT) are baked into section 5. Standard no-warranty in section 6.
+- **App icon**: generated deterministically by `Scripts/generate_app_icon.swift` — a standalone Swift script that renders a 1024×1024 master (charcoal→black vertical gradient, rounded squircle, centered black pill evoking the notch, soft blurred blue glow via `CIGaussianBlur`, subtle inner highlight stroke) and downscales to all 10 AppIcon.appiconset slots. Rerun with `swift Scripts/generate_app_icon.swift` after tweaking any parameter at the top of the file. No design tool involved, every render is reproducible.
+- **Sparkle updater**: added `sparkle-project/Sparkle` as an SPM dependency, pinned to 2.9.1 (`upToNextMajorVersion` from 2.6.0). `AppDelegate` now owns a lazy `SPUStandardUpdaterController` started eagerly (`startingUpdater: true`) so the framework can schedule its own background checks. Menu bar gets a new "Check for Updates…" item targeting the controller directly — Sparkle handles enable/disable state automatically. `applicationDidFinishLaunching` touches the lazy property to boot the updater; the UI-test guard (`XCTestConfigurationFilePath`) skips it so the UI test runner isn't disturbed.
+- **Sparkle Info.plist keys**: injected via the `INFOPLIST_KEY_*` build-setting mechanism on both Debug and Release configurations of the app target. Current values are prelaunch placeholders:
+  - `SUEnableAutomaticChecks = NO` — keeps the pre-public build quiet.
+  - `SUFeedURL = https://example.com/dynamicmac/appcast.xml` — placeholder, will be swapped when the appcast is hosted.
+  - `SUPublicEDKey = ""` — empty until the EdDSA keypair is generated with Sparkle's `generate_keys` tool. Sparkle logs a warning but still handles manual "Check for Updates…" invocations during development.
+  Pre-public-release checklist (owned by the user): run `generate_keys`, store the private key outside the repo, paste the public key into `INFOPLIST_KEY_SUPublicEDKey`, host an appcast, and swap the feed URL.
+- **README.md**: written at the repo root. Covers description, status, requirements, features, build-from-source, icon regeneration, Sparkle prelaunch notes, third-party attributions, and a pointer to `LICENSE`. User explicitly authorized creation ("create it yourself") — the default global rule forbidding unsolicited README creation is satisfied.
+- **Clean build**: `xcodebuild -project DynamicMac.xcodeproj -scheme DynamicMac -configuration Debug -destination 'platform=macOS' build` succeeds after all edits, zero warnings under Swift 6 strict concurrency.
+
+**Part B — deferred to the user (needs physical machine access)**:
+- **Notarization**: archive in Xcode → Distribute → Developer ID → `notarytool submit --wait` → `stapler staple`. Verify with `codesign --verify --deep --strict` and `spctl -a -v`.
+- **Gatekeeper smoke test**: install the notarized app on a clean user account, confirm no Gatekeeper dialog, launch, verify the menu bar icon appears and no Dock icon shows.
+- **Instruments profiling**: Time Profiler on hover expand/collapse (main-thread work >2ms is a smell), Allocations over a 10-minute media+timer run to catch retain cycles in `MediaRemoteAdapterBridge.readabilityHandler`.
+- **VoiceOver end-to-end**: walk every interactive control with VoiceOver on, confirm labels and hints announce correctly.
+- **Activity Monitor acceptance**: idle <1%, animating <5%, Energy Impact "Low".
+- **Fullscreen compatibility**: confirm island appears above Safari fullscreen; record behavior under exclusive-fullscreen games (known macOS limitation).
+- **Pre-public-release Sparkle keygen**: generate EdDSA keypair, host appcast, update the two `INFOPLIST_KEY_SU*` placeholders.
+
 **Goal**: shippable v1 artifact. Notarized, signed, battery-friendly, accessible, tested on notched + non-notched and macOS 15 + 26.
 
 **Code review pass**:
@@ -553,8 +588,8 @@ Flat list, paths relative to repo root. Each line is the purpose in one sentence
 - **Focus steal regression**. DynamicNotchKit should handle `.nonactivatingPanel` correctly. Verify expanding the island never pulls focus from the foreground app. Add to Phase 1 verification checklist permanently.
 - **File length**. `MediaRemoteAdapterBridge.swift` most likely to hit 250 limit. Plan to split into `+Process`, `+Parsing` extensions. Flag during Phase 5.
 - **Open question: dev Mac model**. Affects notch-height testing, fullscreen game test viability, ProMotion vs 60Hz tuning.
-- **Open question: app icon**. No asset present. Ship v1 with SF Symbol placeholder or commission one?
-- **Open question: license**. Global CLAUDE.md doesn't specify. Needed for README + About in Phase 5.
+- ~~**Open question: app icon**.~~ **Resolved Phase 5 Part B**: generated in-repo via `Scripts/generate_app_icon.swift`, a deterministic AppKit render (squircle + pill + blurred glow). Rerunnable.
+- ~~**Open question: license**.~~ **Resolved Phase 5 Part B**: proprietary, all rights reserved, with a personal non-commercial free-binary grant. See `LICENSE`. User stated "not open source but the program will be free for now", so permissive OSS licenses were ruled out.
 
 ## 7. Verification / definition of done
 

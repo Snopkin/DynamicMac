@@ -22,6 +22,9 @@ struct TimerModel: Codable, Equatable {
         case finished
     }
 
+    /// Reserved for future multi-timer support — currently a single timer
+    /// exists at a time, but removing a `Codable` field later is an
+    /// unnecessary migration headache.
     let id: UUID
     var label: String
     var duration: TimeInterval

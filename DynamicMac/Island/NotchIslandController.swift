@@ -7,55 +7,125 @@
 
 import AppKit
 import DynamicNotchKit
+import os
 import SwiftUI
 
 /// Owns the `DynamicNotch` overlay plus a `NotchHoverDetector` that triggers
-/// expand/hide as the cursor enters and leaves the notch region, and a
-/// reference to the `TimerService` so the expanded content can route to
-/// the timer widget or a placeholder.
+/// expand/hide as the cursor enters and leaves the notch region. Holds
+/// the service references `IslandRouterView` reads from (timer, media,
+/// pomodoro, app launcher, power monitor, settings) so the expanded
+/// content can route to whichever widget has the highest-priority live
+/// content, falling back to the app launcher or an inline hint.
 ///
-/// DynamicNotchKit's `init` only registers the notch; it does not create any
-/// NSPanel or listen for hovers until `expand()` is called. The hover
-/// detector bridges that gap with an always-on thin NSPanel + NSTrackingArea.
-/// `hoverBehavior: .keepVisible` on the notch keeps the island open while
-/// the cursor is inside the expanded content, so a brief cursor exit from
-/// the notch strip into the expanded island area does not dismiss the view.
+/// Behavior is split across sibling extensions to keep each file focused:
 ///
-/// When a timer completes, `TimerService.onTimerFinished` fires and we
-/// programmatically `expand()` the notch for `finishedExpandedLinger`
-/// seconds to draw the user's attention, then collapse.
-///
-/// ## Notch task serialization
-///
-/// All calls into `DynamicNotch.expand()` / `DynamicNotch.hide()` are
-/// threaded through a single serial chain via `enqueueNotchTask`. This
-/// works around a continuation-leak bug in DynamicNotchKit 1.0.0 where
-/// calling `expand()` while a previous `hide()` is still animating
-/// cancels the hide's internal `closePanelTask`, stranding the
-/// `withCheckedContinuation` that `public func hide()` awaits and
-/// triggering a "SWIFT TASK CONTINUATION MISUSE: hide() leaked its
-/// continuation" runtime warning. By guaranteeing that `expand()` only
-/// runs after any in-flight `hide()` has fully completed, the cancel
-/// path inside DynamicNotchKit becomes unreachable.
+/// - **`+Chain.swift`** — serialized expand/hide task chain, working
+///   around a continuation-leak bug in DynamicNotchKit 1.0.0.
+/// - **`+Hover.swift`** — enter/exit handlers with debounced exit and
+///   phantom re-enter suppression.
+/// - **`+Attention.swift`** — programmatic linger on timer/pomodoro
+///   completion.
+/// - **`+Scroll.swift`** — trackpad swipe cycling via local + global
+///   `NSEvent` monitors.
 @MainActor
 final class NotchIslandController {
 
     let timerService: TimerService
     let mediaService: MediaService
+    let appSettings: AppSettings
+    let powerMonitor: PowerMonitor
+    let pomodoroService: PomodoroService
+    let appLauncherService: AppLauncherService
 
-    private var notch: DynamicNotch<IslandRouterView, EmptyView, EmptyView>?
-    private var hoverDetector: NotchHoverDetector?
-    private var cursorInsideNotch = false
-    private var programmaticLingerTask: Task<Void, Never>?
+    /// Shared router selection state. Owned here (not as `@State` inside
+    /// `IslandRouterView`) because the trackpad-scroll `NSEvent` local
+    /// monitor installed below runs outside the SwiftUI view hierarchy
+    /// and must mutate the same index the view reads. Holding it on the
+    /// controller also keeps the user's pager position across collapse/
+    /// expand cycles even if DynamicNotchKit rebuilds its hosted view.
+    let routerState = IslandRouterState()
+
+    /// Terminal state the serialized notch chain is converging toward.
+    /// Used to coalesce redundant expand/hide enqueues. Internal access
+    /// so the chain extension in another file can mutate it.
+    enum IntendedState { case hidden, expanded }
+
+    /// The `DynamicNotch` instance. Internal so the chain extension can
+    /// capture it strongly for the duration of each enqueued operation.
+    var notch: DynamicNotch<IslandRouterView, EmptyView, EmptyView>?
+    private(set) var hoverDetector: NotchHoverDetector?
+    var cursorInsideNotch = false
 
     /// Tail of the serialized expand/hide task chain. Each new request
     /// awaits this task before running its operation and then becomes
-    /// the new tail.
-    private var pendingNotchTask: Task<Void, Never>?
+    /// the new tail. Internal so the chain extension can read and replace
+    /// it.
+    var pendingNotchTask: Task<Void, Never>?
 
-    init(timerService: TimerService, mediaService: MediaService) {
+    /// The state the chain will land on after the currently-queued ops
+    /// drain. Starts at `.hidden` because nothing is shown until the
+    /// first expand is requested. Internal so the chain extension can
+    /// read and mutate it.
+    var intendedState: IntendedState = .hidden
+
+    /// True while the chain is executing `notch.hide()`. Prevents
+    /// `requestHide` from cancelling the chain during a hide — that
+    /// would leak DynamicNotchKit's `withCheckedContinuation`.
+    var isRunningHide = false
+
+    /// Task token for the programmatic attention linger. Internal so the
+    /// attention extension can manage it from a sibling file.
+    var programmaticLingerTask: Task<Void, Never>?
+
+    /// 60 Hz timer that polls cursor position to detect when it leaves
+    /// the DNK panel body. See `+Hover.swift` for the full story.
+    var panelExitTimer: Foundation.Timer?
+
+    /// Legacy mouse-moved monitors (kept for cleanup in stopPanelExitTracker).
+    var panelExitMonitor: Any?
+    var panelExitLocalMonitor: Any?
+
+    /// Handles returned by `NSEvent.addLocalMonitorForEvents` and
+    /// `addGlobalMonitorForEvents`. Both are stored so `shutdown()` can
+    /// balance the add calls — the monitors outlive the controller
+    /// otherwise and keep calling into a freed `self`. The local
+    /// monitor fires when a DNK panel is the key window (post-click);
+    /// the global monitor fires when the cursor is over a panel that
+    /// has not become key, which is the usual hover case. See
+    /// `NotchIslandController+Scroll.swift` for why we need both.
+    /// Written from the scroll extension.
+    var localScrollMonitor: Any?
+    var globalScrollMonitor: Any?
+
+    /// Accumulated horizontal scroll distance since the last committed
+    /// page change. Drives the swipe-threshold gate inside the scroll
+    /// monitor handler. Reset on `.began` / `.ended` gesture phases.
+    /// Mutated from `NotchIslandController+Scroll.swift`.
+    var scrollAccumulatedDeltaX: CGFloat = 0
+
+    /// Wall-clock timestamp of the most recent committed scroll-driven
+    /// page change. Used to swallow momentum-scroll tails so a single
+    /// flick cycles exactly one widget. Mutated from the scroll extension.
+    var scrollLastCommitAt: Date?
+
+    /// Read by the attention extension to decide whether to auto-collapse
+    /// once the linger expires.
+    var isCursorInsideNotch: Bool { cursorInsideNotch }
+
+    init(
+        timerService: TimerService,
+        mediaService: MediaService,
+        appSettings: AppSettings,
+        powerMonitor: PowerMonitor,
+        pomodoroService: PomodoroService,
+        appLauncherService: AppLauncherService
+    ) {
         self.timerService = timerService
         self.mediaService = mediaService
+        self.appSettings = appSettings
+        self.powerMonitor = powerMonitor
+        self.pomodoroService = pomodoroService
+        self.appLauncherService = appLauncherService
     }
 
     func start() {
@@ -63,11 +133,24 @@ final class NotchIslandController {
         // references even if the controller is later torn down.
         let timers = timerService
         let media = mediaService
+        let settings = appSettings
+        let power = powerMonitor
+        let pomodoro = pomodoroService
+        let launcher = appLauncherService
+        let router = routerState
         let notch = DynamicNotch(
-            hoverBehavior: [.keepVisible, .increaseShadow],
+            hoverBehavior: [.increaseShadow],
             style: .auto
         ) {
-            IslandRouterView(timerService: timers, mediaService: media)
+            IslandRouterView(
+                timerService: timers,
+                mediaService: media,
+                appSettings: settings,
+                powerMonitor: power,
+                pomodoroService: pomodoro,
+                appLauncherService: launcher,
+                routerState: router
+            )
         }
         self.notch = notch
 
@@ -82,8 +165,14 @@ final class NotchIslandController {
         detector.start()
         self.hoverDetector = detector
 
+        installScrollMonitor()
+
         timerService.onTimerFinished = { [weak self] in
             self?.handleTimerFinished()
+        }
+
+        pomodoroService.onPhaseTransition = { [weak self] _ in
+            self?.handlePomodoroPhaseTransition()
         }
 
         // Media changes are not currently an attention event — we let
@@ -98,8 +187,12 @@ final class NotchIslandController {
     func shutdown() {
         programmaticLingerTask?.cancel()
         programmaticLingerTask = nil
+        stopPanelExitTracker()
+
+        removeScrollMonitor()
 
         timerService.onTimerFinished = nil
+        pomodoroService.onPhaseTransition = nil
         mediaService.onPlaybackStateBecameActive = nil
         mediaService.stop()
 
@@ -116,79 +209,22 @@ final class NotchIslandController {
     }
 
     // MARK: - Hover handlers
-
-    private func handleEnter() {
-        cursorInsideNotch = true
-        // A cursor-driven expansion cancels any pending programmatic
-        // collapse, so the user can interact with a finished-state widget
-        // without it disappearing underneath them.
-        programmaticLingerTask?.cancel()
-        programmaticLingerTask = nil
-
-        requestExpand()
-    }
-
-    private func handleExit() {
-        cursorInsideNotch = false
-
-        // Don't collapse while a programmatic linger is in flight — that
-        // task owns the collapse timing.
-        guard programmaticLingerTask == nil else { return }
-        requestHide()
-    }
+    //
+    // `handleEnter` and `handleExit` live in
+    // `NotchIslandController+Hover.swift`. They manage
+    // `cursorInsideNotch`, `lastExitAt`, `pendingExitTask`, and
+    // coordinate with `programmaticLingerTask`.
 
     // MARK: - Programmatic attention
-
-    private func handleTimerFinished() {
-        programmaticLingerTask?.cancel()
-
-        programmaticLingerTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            self.requestExpand()
-
-            try? await Task.sleep(for: .seconds(Constants.Timers.finishedExpandedLinger))
-
-            self.programmaticLingerTask = nil
-
-            // Only collapse if the user isn't currently hovering; if they
-            // are, honor the hover state and leave the island open until
-            // they move away.
-            if !self.cursorInsideNotch {
-                self.requestHide()
-            }
-        }
-    }
-
-    // MARK: - Serialized notch operations
-
-    /// Appends a `notch.expand()` call to the serial chain. Returns
-    /// immediately; the expand happens after any previously-queued hide.
-    private func requestExpand() {
-        enqueueNotchOperation { notch in
-            await notch.expand()
-        }
-    }
-
-    /// Appends a `notch.hide()` call to the serial chain.
-    private func requestHide() {
-        enqueueNotchOperation { notch in
-            await notch.hide()
-        }
-    }
-
-    /// Core enqueue primitive. Chains the new operation after the current
-    /// tail, captures the notch strongly for the duration of the call so
-    /// shutdown's `self.notch = nil` doesn't race the operation, and
-    /// installs the new task as the chain tail.
-    private func enqueueNotchOperation(
-        _ operation: @escaping @MainActor (DynamicNotch<IslandRouterView, EmptyView, EmptyView>) async -> Void
-    ) {
-        guard let notch else { return }
-        let previous = pendingNotchTask
-
-        pendingNotchTask = Task { @MainActor in
-            _ = await previous?.value
-            await operation(notch)
-        }
-    }
+    //
+    // The `handleTimerFinished` and `handlePomodoroPhaseTransition`
+    // callbacks live in `NotchIslandController+Attention.swift` so this
+    // file stays focused on hover + lifecycle. The extension reads
+    // `isCursorInsideNotch` and mutates `programmaticLingerTask` to
+    // coordinate with the hover handlers above.
+    //
+    // The `installScrollMonitor` / `removeScrollMonitor` pair and the
+    // matching `handleScroll` event handler live in
+    // `NotchIslandController+Scroll.swift`. They mutate `scrollMonitor`,
+    // `scrollAccumulatedDeltaX`, and `scrollLastCommitAt` declared above.
 }
