@@ -9,9 +9,10 @@ import SwiftUI
 
 /// Widget enable/disable toggles and drag-to-reorder priority list.
 ///
-/// Rows reorder visually in real time as the user drags. The underlying
-/// data is only committed when the drag ends, avoiding the SwiftUI
-/// re-render feedback loop that causes flickering.
+/// Uses a pure-offset approach: the `ForEach` source array is **never
+/// mutated** during a drag. The dragged row follows the finger via
+/// `dragTranslation`, and displaced rows slide out of the way via
+/// animated ±rowHeight offsets. The array is committed once on drop.
 struct WidgetsSettingsTab: View {
 
     @Bindable var settings: AppSettings
@@ -25,22 +26,14 @@ struct WidgetsSettingsTab: View {
     /// Height of a single row, measured once via GeometryReader.
     @State private var rowHeight: CGFloat = 40
 
-    /// The display order during a drag. `nil` when idle — reads from
-    /// `settings.widgetOrder` directly.
-    @State private var liveOrder: [WidgetID]?
-
-    /// The index the dragged widget has been visually moved to.
-    @State private var liveIndex: Int?
-
-    private var displayOrder: [WidgetID] {
-        liveOrder ?? settings.widgetOrder
-    }
+    /// The slot the dragged item should land in. Updated with hysteresis.
+    @State private var targetSlot: Int?
 
     var body: some View {
         Form {
             Section {
                 VStack(spacing: 0) {
-                    ForEach(Array(displayOrder.enumerated()), id: \.element) { index, widget in
+                    ForEach(Array(settings.widgetOrder.enumerated()), id: \.element) { index, widget in
                         let isDragging = draggingWidget == widget
 
                         WidgetRow(
@@ -69,7 +62,7 @@ struct WidgetsSettingsTab: View {
                                       ? Color.accentColor.opacity(0.12)
                                       : Color.clear)
                         )
-                        .offset(y: isDragging ? remainingOffset : 0)
+                        .offset(y: yOffset(at: index, isDragging: isDragging))
                         .zIndex(isDragging ? 1 : 0)
                         .opacity(isDragging ? 0.9 : 1)
                         .gesture(
@@ -82,8 +75,9 @@ struct WidgetsSettingsTab: View {
                                 }
                         )
 
-                        if widget != displayOrder.last {
+                        if widget != settings.widgetOrder.last {
                             Divider().padding(.leading, 36)
+                                .opacity(draggingWidget == nil ? 1 : 0)
                         }
                     }
                 }
@@ -103,73 +97,97 @@ struct WidgetsSettingsTab: View {
         .formStyle(.grouped)
     }
 
-    // MARK: - Drag logic
+    // MARK: - Offset calculation
 
-    /// The leftover offset after snapping the dragged item to its new slot.
-    private var remainingOffset: CGFloat {
-        guard let draggingWidget,
-              let originalIndex = settings.widgetOrder.firstIndex(of: draggingWidget),
-              let currentIndex = liveIndex else {
+    /// Returns the y-offset for the row at `index`.
+    /// - Dragged row: follows the finger directly (`dragTranslation`).
+    /// - Displaced rows: shift ±rowHeight to make room.
+    /// - All others: 0.
+    private func yOffset(at index: Int, isDragging: Bool) -> CGFloat {
+        if isDragging {
+            return dragTranslation
+        }
+
+        guard let dragIndex = draggingWidget.flatMap({ settings.widgetOrder.firstIndex(of: $0) }),
+              let target = targetSlot else {
             return 0
         }
-        let slotsMoved = currentIndex - originalIndex
-        return dragTranslation - CGFloat(slotsMoved) * rowHeight
+
+        if dragIndex < target {
+            // Dragging down: rows between origin+1…target shift up.
+            if index > dragIndex && index <= target {
+                return -rowHeight
+            }
+        } else if dragIndex > target {
+            // Dragging up: rows between target…origin-1 shift down.
+            if index >= target && index < dragIndex {
+                return rowHeight
+            }
+        }
+
+        return 0
     }
+
+    // MARK: - Drag logic
 
     private func handleDragChanged(widget: WidgetID, translation: CGFloat) {
         if draggingWidget == nil {
             draggingWidget = widget
-            liveOrder = settings.widgetOrder
-            liveIndex = settings.widgetOrder.firstIndex(of: widget)
+            targetSlot = settings.widgetOrder.firstIndex(of: widget)
         }
-        guard draggingWidget == widget,
-              var targetIndex = liveIndex,
-              let startIndex = settings.widgetOrder.firstIndex(of: widget) else { return }
+        guard draggingWidget == widget else { return }
 
         dragTranslation = translation
 
+        guard let dragIndex = settings.widgetOrder.firstIndex(of: widget),
+              let currentTarget = targetSlot else { return }
+
         let count = settings.widgetOrder.count
 
-        // Walk from the current slot towards the drag position. Computing
-        // relative to the *current* live slot gives built-in hysteresis:
-        // once an item snaps to a new slot it must travel another half-row
-        // from *that* slot before swapping again, preventing oscillation
-        // at the boundary.
-        var offset = translation - CGFloat(targetIndex - startIndex) * rowHeight
+        // Walk from the *current* target slot toward the finger position.
+        // Computing relative to the current slot (not the origin) gives
+        // built-in hysteresis: after snapping, the finger must travel
+        // another half-row from the new slot before the next swap.
+        var newTarget = currentTarget
+        var offset = translation - CGFloat(newTarget - dragIndex) * rowHeight
 
-        while offset > rowHeight * 0.5, targetIndex < count - 1 {
-            targetIndex += 1
-            offset = translation - CGFloat(targetIndex - startIndex) * rowHeight
+        while offset > rowHeight * 0.5, newTarget < count - 1 {
+            newTarget += 1
+            offset = translation - CGFloat(newTarget - dragIndex) * rowHeight
         }
-        while offset < -rowHeight * 0.5, targetIndex > 0 {
-            targetIndex -= 1
-            offset = translation - CGFloat(targetIndex - startIndex) * rowHeight
+        while offset < -rowHeight * 0.5, newTarget > 0 {
+            newTarget -= 1
+            offset = translation - CGFloat(newTarget - dragIndex) * rowHeight
         }
 
-        if targetIndex != liveIndex {
-            var newOrder = settings.widgetOrder
-            newOrder.remove(at: startIndex)
-            newOrder.insert(widget, at: targetIndex)
-            // Update liveIndex immediately (no animation) so the dragged
-            // item's offset stays glued to the finger. Only animate the
-            // list reorder so *other* rows slide smoothly.
-            liveIndex = targetIndex
+        if newTarget != currentTarget {
             withAnimation(.easeInOut(duration: 0.15)) {
-                liveOrder = newOrder
+                targetSlot = newTarget
             }
         }
     }
 
     private func handleDragEnded() {
-        // Commit the visual order to the actual settings.
-        if let finalOrder = liveOrder {
-            settings.widgetOrder = finalOrder
-        }
-        withAnimation(.easeOut(duration: 0.15)) {
+        guard let draggingWidget,
+              let dragIndex = settings.widgetOrder.firstIndex(of: draggingWidget),
+              let target = targetSlot else {
+            self.draggingWidget = nil
             dragTranslation = 0
-            draggingWidget = nil
-            liveOrder = nil
-            liveIndex = nil
+            targetSlot = nil
+            return
+        }
+
+        // Commit the reorder and animate everything to its final position.
+        withAnimation(.easeOut(duration: 0.15)) {
+            if target != dragIndex {
+                var newOrder = settings.widgetOrder
+                newOrder.remove(at: dragIndex)
+                newOrder.insert(draggingWidget, at: target)
+                settings.widgetOrder = newOrder
+            }
+            self.draggingWidget = nil
+            dragTranslation = 0
+            targetSlot = nil
         }
     }
 }
