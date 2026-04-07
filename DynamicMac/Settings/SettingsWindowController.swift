@@ -75,6 +75,8 @@ final class SettingsWindowController {
         let window = NSWindow(contentViewController: hosting)
         window.title = "DynamicMac Settings"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.setContentSize(NSSize(width: 720, height: 480))
+        window.contentMinSize = NSSize(width: 720, height: 400)
         window.isReleasedWhenClosed = false
         window.center()
         window.setFrameAutosaveName("DynamicMacSettingsWindow")
