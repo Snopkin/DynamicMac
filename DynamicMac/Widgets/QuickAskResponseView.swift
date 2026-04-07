@@ -42,7 +42,7 @@ struct QuickAskResponseView: View {
         .fixedSize(horizontal: false, vertical: true)
         .background(Color.black)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .shadow(color: .black.opacity(0.4), radius: 12, y: 4)
+        .shadow(color: .black.opacity(0.4), radius: 4, y: 2)
     }
 
     // MARK: - Question header (history only)
