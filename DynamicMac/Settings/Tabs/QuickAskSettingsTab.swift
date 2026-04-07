@@ -21,7 +21,7 @@ struct QuickAskSettingsTab: View {
         Form {
             Section {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("The bundled key works out of the box. Enter your own key below to override it.")
+                    Text("Quick Ask works out of the box. If you'd like to use a stronger model, you can provide your own API key.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
 
@@ -79,7 +79,7 @@ struct QuickAskSettingsTab: View {
             } header: {
                 Text("API Key")
             } footer: {
-                Text("Your key is stored securely in the macOS Keychain.")
+                Text("Your key is stored securely in the macOS Keychain and never leaves your device.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
