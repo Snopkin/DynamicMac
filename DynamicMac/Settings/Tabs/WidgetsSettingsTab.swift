@@ -120,25 +120,42 @@ struct WidgetsSettingsTab: View {
         if draggingWidget == nil {
             draggingWidget = widget
             liveOrder = settings.widgetOrder
+            liveIndex = settings.widgetOrder.firstIndex(of: widget)
         }
-        guard draggingWidget == widget else { return }
+        guard draggingWidget == widget,
+              var targetIndex = liveIndex,
+              let startIndex = settings.widgetOrder.firstIndex(of: widget) else { return }
 
         dragTranslation = translation
 
-        guard let sourceIndex = settings.widgetOrder.firstIndex(of: widget) else { return }
+        let count = settings.widgetOrder.count
 
-        // How many rows has the drag crossed from the original position?
-        let rowsCrossed = Int((translation / rowHeight).rounded())
-        let targetIndex = min(max(sourceIndex + rowsCrossed, 0),
-                              settings.widgetOrder.count - 1)
+        // Walk from the current slot towards the drag position. Computing
+        // relative to the *current* live slot gives built-in hysteresis:
+        // once an item snaps to a new slot it must travel another half-row
+        // from *that* slot before swapping again, preventing oscillation
+        // at the boundary.
+        var offset = translation - CGFloat(targetIndex - startIndex) * rowHeight
+
+        while offset > rowHeight * 0.5, targetIndex < count - 1 {
+            targetIndex += 1
+            offset = translation - CGFloat(targetIndex - startIndex) * rowHeight
+        }
+        while offset < -rowHeight * 0.5, targetIndex > 0 {
+            targetIndex -= 1
+            offset = translation - CGFloat(targetIndex - startIndex) * rowHeight
+        }
 
         if targetIndex != liveIndex {
             var newOrder = settings.widgetOrder
-            newOrder.remove(at: sourceIndex)
+            newOrder.remove(at: startIndex)
             newOrder.insert(widget, at: targetIndex)
+            // Update liveIndex immediately (no animation) so the dragged
+            // item's offset stays glued to the finger. Only animate the
+            // list reorder so *other* rows slide smoothly.
+            liveIndex = targetIndex
             withAnimation(.easeInOut(duration: 0.15)) {
                 liveOrder = newOrder
-                liveIndex = targetIndex
             }
         }
     }
