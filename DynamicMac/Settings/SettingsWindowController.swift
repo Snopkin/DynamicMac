@@ -77,6 +77,7 @@ final class SettingsWindowController {
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.setContentSize(NSSize(width: 720, height: 480))
         window.contentMinSize = NSSize(width: 720, height: 400)
+        window.titlebarSeparatorStyle = .none
         window.isReleasedWhenClosed = false
         window.center()
         window.setFrameAutosaveName("DynamicMacSettingsWindow")
