@@ -50,7 +50,7 @@ final class AIService {
 
     private static let maxHistoryCount = 10
     private static let apiURL = URL(string: "https://api.anthropic.com/v1/messages")!
-    private static let maxTokens = 300
+    private static let maxTokens = 1024
     private static let systemPrompt = """
         Answer in 1-3 sentences max. Be direct and concise. \
         No filler words, no preamble, no transitional phrases like \
