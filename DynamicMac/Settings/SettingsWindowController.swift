@@ -8,20 +8,12 @@
 import AppKit
 import SwiftUI
 
-/// Hosts `SettingsView` inside a plain `NSWindow`. We used to rely on
-/// SwiftUI's `Settings` scene + the `showSettingsWindow:` selector, but
-/// on macOS 14+ that path is deprecated and SwiftUI logs
-/// "Please use SettingsLink for opening the Settings scene." without
-/// actually showing the window under `LSUIElement`. `SettingsLink` only
-/// works from a SwiftUI view, so it can't be driven from our AppKit
-/// `NSStatusItem` menu.
+/// Hosts the Settings UI inside an `NSTabViewController` so the tabs render
+/// in the window toolbar — the native macOS System Settings look — instead
+/// of SwiftUI's `TabView` which draws an unavoidable bezel border.
 ///
-/// Owning the window directly sidesteps both problems: the menu item
-/// asks this controller to show itself, the controller flips the
-/// activation policy to `.regular`, orders the window front, and
-/// registers a `willClose` observer that flips the policy back to
-/// `.accessory` so the Dock icon disappears again as soon as the
-/// Settings window is dismissed.
+/// Owning the window directly sidesteps the `showSettingsWindow:` deprecation
+/// on macOS 14+ and the `LSUIElement` incompatibility with `SettingsLink`.
 @MainActor
 final class SettingsWindowController {
 
@@ -45,15 +37,6 @@ final class SettingsWindowController {
         self.clipboardService = clipboardService
     }
 
-    // No deinit: this controller is owned for the app's lifetime by
-    // `AppDelegate` (lazy property), so the will-close observer cannot
-    // outlive it. Adding a deinit here would force it to be nonisolated,
-    // which Swift 6 strict concurrency forbids from touching MainActor
-    // state like the stored observer token.
-
-    /// Shows the Settings window, creating it lazily on first call. Safe
-    /// to invoke repeatedly — subsequent calls just bring the existing
-    /// window to the front.
     func show() {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
@@ -63,21 +46,35 @@ final class SettingsWindowController {
             return
         }
 
-        let hosting = NSHostingController(
-            rootView: SettingsView(
-                settings: settings,
-                mediaService: mediaService,
-                appLauncherService: appLauncherService,
-                clipboardService: clipboardService
-            )
-        )
+        let tabVC = NSTabViewController()
+        tabVC.tabStyle = .toolbar
 
-        let window = NSWindow(contentViewController: hosting)
+        let tabs: [(String, String, AnyView)] = [
+            ("General",    "gearshape",             AnyView(GeneralSettingsTab(settings: settings))),
+            ("Appearance", "paintpalette",           AnyView(AppearanceSettingsTab(settings: settings))),
+            ("Widgets",    "square.grid.2x2",        AnyView(WidgetsSettingsTab(settings: settings))),
+            ("Pomodoro",   "leaf.fill",              AnyView(PomodoroSettingsTab(settings: settings))),
+            ("Launcher",   "square.grid.3x3.fill",   AnyView(LauncherSettingsTab(settings: settings, launcher: appLauncherService))),
+            ("Clipboard",  "doc.on.clipboard",       AnyView(ClipboardSettingsTab(settings: settings, clipboardService: clipboardService))),
+            ("Quick Ask",  "sparkles",               AnyView(QuickAskSettingsTab(settings: settings))),
+            ("Media",      "music.note",             AnyView(MediaSettingsTab(settings: settings, mediaService: mediaService))),
+            ("About",      "info.circle",            AnyView(AboutSettingsTab())),
+        ]
+
+        for (title, icon, view) in tabs {
+            let hosting = NSHostingController(rootView: view)
+            hosting.title = title
+            let item = NSTabViewItem(viewController: hosting)
+            item.label = title
+            item.image = NSImage(systemSymbolName: icon, accessibilityDescription: title)
+            tabVC.addTabViewItem(item)
+        }
+
+        let window = NSWindow(contentViewController: tabVC)
         window.title = "DynamicMac Settings"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.setContentSize(NSSize(width: 720, height: 480))
         window.contentMinSize = NSSize(width: 720, height: 400)
-        window.titlebarSeparatorStyle = .none
         window.isReleasedWhenClosed = false
         window.center()
         window.setFrameAutosaveName("DynamicMacSettingsWindow")
@@ -91,12 +88,6 @@ final class SettingsWindowController {
             object: window,
             queue: .main
         ) { _ in
-            // Drop back to LSUIElement accessory mode so the Dock icon
-            // disappears as soon as the user dismisses Settings. Hop to
-            // the main actor explicitly — NotificationCenter's
-            // `addObserver(forName:object:queue:using:)` delivers on the
-            // given queue but the closure is `@Sendable`, not
-            // MainActor-isolated.
             Task { @MainActor in
                 NSApp.setActivationPolicy(.accessory)
             }
