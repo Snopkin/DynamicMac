@@ -130,14 +130,24 @@ final class AIService {
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
 
+        // Build a messages array that includes recent conversation history
+        // so follow-up questions have context. Each prior exchange adds a
+        // user message and an assistant message. Capped to the last 5
+        // exchanges to stay well within context limits and keep latency low.
+        var messages: [[String: String]] = []
+        let recentHistory = history.suffix(5)
+        for entry in recentHistory {
+            messages.append(["role": "user", "content": entry.question])
+            messages.append(["role": "assistant", "content": entry.answer])
+        }
+        messages.append(["role": "user", "content": question])
+
         let body: [String: Any] = [
             "model": AIKeyProvider.model,
             "max_tokens": Self.maxTokens,
             "stream": true,
             "system": Self.systemPrompt,
-            "messages": [
-                ["role": "user", "content": question]
-            ]
+            "messages": messages
         ]
 
         guard let httpBody = try? JSONSerialization.data(withJSONObject: body) else {

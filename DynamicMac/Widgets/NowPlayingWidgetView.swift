@@ -72,7 +72,7 @@ struct NowPlayingWidgetView: View {
                     .aspectRatio(contentMode: .fill)
             } else {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(.white.opacity(0.12))
+                    .fill(.white.opacity(0.08))
                     .overlay {
                         Image(systemName: "music.note")
                             .foregroundStyle(.white.opacity(0.6))
@@ -100,7 +100,7 @@ struct NowPlayingWidgetView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 28, height: 28)
-                .background(Circle().fill(.white.opacity(0.12)))
+                .background(Circle().fill(.white.opacity(0.08)))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel)

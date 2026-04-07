@@ -141,7 +141,7 @@ private struct CodeSpanChip: View {
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 2)
-        .background(Color.white.opacity(0.1))
+        .background(Color.white.opacity(0.06))
         .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
     }
 }

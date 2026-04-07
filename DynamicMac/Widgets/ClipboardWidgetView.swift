@@ -112,7 +112,7 @@ struct ClipboardWidgetView: View {
         .padding(.horizontal, 6)
         .background(
             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(.white.opacity(0.06))
+                .fill(.white.opacity(0.04))
         )
     }
 

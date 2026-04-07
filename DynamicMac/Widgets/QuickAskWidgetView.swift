@@ -154,7 +154,7 @@ struct QuickAskWidgetView: View {
         .padding(.vertical, 6)
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(.white.opacity(0.08))
+                .fill(.white.opacity(0.05))
         )
         .onAppear {
             isFieldFocused = true
@@ -196,7 +196,7 @@ struct QuickAskWidgetView: View {
         .padding(.vertical, 6)
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(.white.opacity(0.06))
+                .fill(.white.opacity(0.04))
         )
     }
 
@@ -219,7 +219,7 @@ private struct StreamingDot: View {
 
     var body: some View {
         Circle()
-            .fill(.white.opacity(isAnimating ? 0.7 : 0.15))
+            .fill(.white.opacity(isAnimating ? 0.7 : 0.10))
             .frame(width: 5, height: 5)
             .animation(
                 .easeInOut(duration: 0.45)

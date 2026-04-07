@@ -82,7 +82,7 @@ struct PomodoroWidgetView: View {
                     .foregroundStyle(.white)
                     .padding(.vertical, 6)
                     .padding(.horizontal, 14)
-                    .background(Capsule().fill(.white.opacity(0.18)))
+                    .background(Capsule().fill(.white.opacity(0.10)))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Start focus block")
@@ -182,7 +182,7 @@ struct PomodoroWidgetView: View {
         return HStack(spacing: 4) {
             ForEach(0..<rounds, id: \.self) { index in
                 Circle()
-                    .fill(index < completed ? Color.green : Color.white.opacity(0.2))
+                    .fill(index < completed ? Color.green : Color.white.opacity(0.15))
                     .frame(width: 6, height: 6)
             }
         }
@@ -198,7 +198,7 @@ struct PomodoroWidgetView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 28, height: 28)
-                .background(Circle().fill(.white.opacity(0.12)))
+                .background(Circle().fill(.white.opacity(0.08)))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel)
@@ -246,7 +246,7 @@ private struct ProgressRing: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(.white.opacity(0.15), lineWidth: 4)
+                .stroke(.white.opacity(0.10), lineWidth: 4)
 
             Circle()
                 .trim(from: 0, to: fraction)

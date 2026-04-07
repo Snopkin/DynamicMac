@@ -150,7 +150,7 @@ final class NotchIslandController {
         let askPanel = quickAskPanelController
         let router = routerState
         let notch = DynamicNotch(
-            hoverBehavior: [.increaseShadow],
+            hoverBehavior: [],
             style: .auto
         ) {
             IslandRouterView(

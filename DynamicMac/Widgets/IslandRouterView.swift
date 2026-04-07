@@ -105,10 +105,12 @@ struct IslandRouterView: View {
                 quickAskPanelController.updateSize()
             }
         }
-        // Dismiss the response panel when streaming finishes and the user
-        // clears the response.
+        // Dismiss the response panel when the response is cleared while
+        // idle. Guard on `!isStreaming` so that a follow-up question
+        // (which briefly resets currentResponse to "") does not kill the
+        // panel before the new stream has a chance to fill it.
         .onChange(of: aiService.currentResponse.isEmpty) { _, isEmpty in
-            if isEmpty {
+            if isEmpty, !aiService.isStreaming {
                 quickAskPanelController.dismiss()
             }
         }
@@ -176,7 +178,7 @@ struct IslandRouterView: View {
                     Circle()
                         .fill(index == currentIndex
                               ? Color.white.opacity(0.85)
-                              : Color.white.opacity(0.25))
+                              : Color.white.opacity(0.20))
                         .frame(width: 5, height: 5)
                 }
             }

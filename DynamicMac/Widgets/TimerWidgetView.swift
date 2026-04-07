@@ -71,7 +71,7 @@ struct TimerWidgetView: View {
                         .padding(.vertical, 6)
                         .padding(.horizontal, 12)
                         .background(
-                            Capsule().fill(.white.opacity(0.12))
+                            Capsule().fill(.white.opacity(0.08))
                         )
                 }
                 .buttonStyle(.plain)
@@ -173,7 +173,7 @@ struct TimerWidgetView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 28, height: 28)
-                .background(Circle().fill(.white.opacity(0.12)))
+                .background(Circle().fill(.white.opacity(0.08)))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel)
@@ -198,7 +198,7 @@ private struct ProgressRing: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(.white.opacity(0.15), lineWidth: 4)
+                .stroke(.white.opacity(0.10), lineWidth: 4)
 
             Circle()
                 .trim(from: 0, to: fraction)
