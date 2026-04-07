@@ -2,13 +2,13 @@
 //  QuickAskSettingsTab.swift
 //  DynamicMac
 //
-//  Created by Lidor Nir Shalom on 06/04/2026.
+//  Created by Lidor Nir Shalom on 05/04/2026.
 //
 
 import SwiftUI
 
-/// Quick Ask configuration. Lets the user supply their own Anthropic API
-/// key (BYOK) which overrides the bundled one, and shows the current model.
+/// Quick Ask configuration. Lets the user supply their Anthropic API key
+/// (stored securely in the macOS Keychain) and shows the current model.
 struct QuickAskSettingsTab: View {
 
     @Bindable var settings: AppSettings
@@ -21,7 +21,7 @@ struct QuickAskSettingsTab: View {
         Form {
             Section {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("The bundled key works out of the box. Enter your own key below to override it.")
+                    Text("Enter your Anthropic API key to enable Quick Ask.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
 
@@ -52,7 +52,7 @@ struct QuickAskSettingsTab: View {
                                 .font(.system(size: 10))
                                 .foregroundStyle(.green)
 
-                            Text("Using your API key")
+                            Text("API key configured")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
 
@@ -64,22 +64,12 @@ struct QuickAskSettingsTab: View {
                             .font(.footnote)
                             .buttonStyle(.borderless)
                         }
-                    } else {
-                        HStack(spacing: 6) {
-                            Image(systemName: "shippingbox.fill")
-                                .font(.system(size: 10))
-                                .foregroundStyle(.secondary)
-
-                            Text("Using bundled API key")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
                     }
                 }
             } header: {
                 Text("API Key")
             } footer: {
-                Text("Your key is stored securely in the macOS Keychain.")
+                Text("Your key is stored securely in the macOS Keychain and never leaves your device.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -88,10 +78,6 @@ struct QuickAskSettingsTab: View {
                 LabeledContent("Model", value: AIKeyProvider.model)
             } header: {
                 Text("Model")
-            } footer: {
-                Text("Configured via the bundled Secrets.plist. Change the \"AnthropicModel\" key to use a different model.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
@@ -105,7 +91,7 @@ struct QuickAskSettingsTab: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("DynamicMac will fall back to the bundled API key.")
+            Text("Quick Ask will be disabled until a new key is added.")
         }
     }
 
