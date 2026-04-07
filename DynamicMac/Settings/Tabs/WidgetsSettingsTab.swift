@@ -9,85 +9,80 @@ import SwiftUI
 
 /// Widget enable/disable toggles and drag-to-reorder priority list.
 ///
-/// Uses a custom vertical drag gesture on each row so items reorder live
-/// as the user drags — no drop-target required. `IslandRouterView` reads
-/// both on every reflow, so changes apply on the next hover without a
-/// relaunch.
+/// Rows reorder visually in real time as the user drags. The underlying
+/// data is only committed when the drag ends, avoiding the SwiftUI
+/// re-render feedback loop that causes flickering.
 struct WidgetsSettingsTab: View {
 
     @Bindable var settings: AppSettings
 
+    /// The widget currently being dragged, if any.
     @State private var draggingWidget: WidgetID?
-    @State private var dragOffset: CGFloat = 0
+
+    /// Raw vertical translation from the drag gesture.
+    @State private var dragTranslation: CGFloat = 0
+
+    /// Height of a single row, measured once via GeometryReader.
     @State private var rowHeight: CGFloat = 40
+
+    /// The display order during a drag. `nil` when idle — reads from
+    /// `settings.widgetOrder` directly.
+    @State private var liveOrder: [WidgetID]?
+
+    /// The index the dragged widget has been visually moved to.
+    @State private var liveIndex: Int?
+
+    private var displayOrder: [WidgetID] {
+        liveOrder ?? settings.widgetOrder
+    }
 
     var body: some View {
         Form {
             Section {
                 VStack(spacing: 0) {
-                    ForEach(Array(settings.widgetOrder.enumerated()), id: \.element) { index, widget in
+                    ForEach(Array(displayOrder.enumerated()), id: \.element) { index, widget in
+                        let isDragging = draggingWidget == widget
+
                         WidgetRow(
                             widget: widget,
                             isEnabled: Binding(
                                 get: { settings.widgetEnabled[widget] ?? true },
                                 set: { settings.widgetEnabled[widget] = $0 }
                             ),
-                            isDragging: draggingWidget == widget
+                            isDragging: isDragging
                         )
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
                         .background(
                             GeometryReader { geo in
                                 Color.clear
-                                    .onAppear { rowHeight = geo.size.height }
+                                    .onAppear {
+                                        if geo.size.height > 10 {
+                                            rowHeight = geo.size.height
+                                        }
+                                    }
                             }
                         )
                         .background(
                             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(draggingWidget == widget
+                                .fill(isDragging
                                       ? Color.accentColor.opacity(0.12)
                                       : Color.clear)
                         )
-                        .offset(y: draggingWidget == widget ? dragOffset : 0)
-                        .zIndex(draggingWidget == widget ? 1 : 0)
+                        .offset(y: isDragging ? remainingOffset : 0)
+                        .zIndex(isDragging ? 1 : 0)
+                        .opacity(isDragging ? 0.9 : 1)
                         .gesture(
                             DragGesture()
                                 .onChanged { value in
-                                    if draggingWidget == nil {
-                                        draggingWidget = widget
-                                    }
-                                    guard draggingWidget == widget else { return }
-                                    dragOffset = value.translation.height
-
-                                    // Calculate how many rows the drag has crossed.
-                                    let rowsCrossed = Int((dragOffset / rowHeight).rounded())
-                                    guard rowsCrossed != 0 else { return }
-
-                                    let currentIndex = settings.widgetOrder.firstIndex(of: widget) ?? index
-                                    let newIndex = min(max(currentIndex + rowsCrossed, 0),
-                                                       settings.widgetOrder.count - 1)
-
-                                    if newIndex != currentIndex {
-                                        withAnimation(.easeInOut(duration: 0.15)) {
-                                            settings.widgetOrder.move(
-                                                fromOffsets: IndexSet(integer: currentIndex),
-                                                toOffset: newIndex > currentIndex ? newIndex + 1 : newIndex
-                                            )
-                                        }
-                                        // Reset offset so it feels snappy at the new position.
-                                        let steps = newIndex - currentIndex
-                                        dragOffset -= CGFloat(steps) * rowHeight
-                                    }
+                                    handleDragChanged(widget: widget, translation: value.translation.height)
                                 }
                                 .onEnded { _ in
-                                    withAnimation(.easeOut(duration: 0.15)) {
-                                        dragOffset = 0
-                                    }
-                                    draggingWidget = nil
+                                    handleDragEnded()
                                 }
                         )
 
-                        if widget != settings.widgetOrder.last {
+                        if widget != displayOrder.last {
                             Divider().padding(.leading, 36)
                         }
                     }
@@ -106,6 +101,59 @@ struct WidgetsSettingsTab: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    // MARK: - Drag logic
+
+    /// The leftover offset after snapping the dragged item to its new slot.
+    private var remainingOffset: CGFloat {
+        guard let draggingWidget,
+              let originalIndex = settings.widgetOrder.firstIndex(of: draggingWidget),
+              let currentIndex = liveIndex else {
+            return 0
+        }
+        let slotsMoved = currentIndex - originalIndex
+        return dragTranslation - CGFloat(slotsMoved) * rowHeight
+    }
+
+    private func handleDragChanged(widget: WidgetID, translation: CGFloat) {
+        if draggingWidget == nil {
+            draggingWidget = widget
+            liveOrder = settings.widgetOrder
+        }
+        guard draggingWidget == widget else { return }
+
+        dragTranslation = translation
+
+        guard let sourceIndex = settings.widgetOrder.firstIndex(of: widget) else { return }
+
+        // How many rows has the drag crossed from the original position?
+        let rowsCrossed = Int((translation / rowHeight).rounded())
+        let targetIndex = min(max(sourceIndex + rowsCrossed, 0),
+                              settings.widgetOrder.count - 1)
+
+        if targetIndex != liveIndex {
+            var newOrder = settings.widgetOrder
+            newOrder.remove(at: sourceIndex)
+            newOrder.insert(widget, at: targetIndex)
+            withAnimation(.easeInOut(duration: 0.15)) {
+                liveOrder = newOrder
+                liveIndex = targetIndex
+            }
+        }
+    }
+
+    private func handleDragEnded() {
+        // Commit the visual order to the actual settings.
+        if let finalOrder = liveOrder {
+            settings.widgetOrder = finalOrder
+        }
+        withAnimation(.easeOut(duration: 0.15)) {
+            dragTranslation = 0
+            draggingWidget = nil
+            liveOrder = nil
+            liveIndex = nil
+        }
     }
 }
 
