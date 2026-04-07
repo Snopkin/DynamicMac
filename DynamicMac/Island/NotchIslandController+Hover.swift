@@ -125,7 +125,9 @@ extension NotchIslandController {
     func startPanelExitTracker() {
         stopPanelExitTracker()
         let timer = Foundation.Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
-            self?.tickPanelExitCheck()
+            Task { @MainActor in
+                self?.tickPanelExitCheck()
+            }
         }
         RunLoop.main.add(timer, forMode: .common)
         panelExitTimer = timer

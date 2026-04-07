@@ -152,7 +152,9 @@ final class QuickAskResponsePanelController {
             context.timingFunction = CAMediaTimingFunction(name: .easeIn)
             panel.animator().alphaValue = 0
         } completionHandler: {
-            panel.orderOut(nil)
+            Task { @MainActor in
+                panel.orderOut(nil)
+            }
         }
     }
 
